@@ -1071,7 +1071,7 @@ function App() {
             <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
               
               {/* Minimalist Feedback Banner */}
-              <div className="w-full max-w-[480px] mb-3 text-center transition-all duration-300 min-h-[32px] flex items-center justify-center gap-3">
+              <div className="w-full max-w-[560px] mb-3 text-center transition-all duration-300 min-h-[32px] flex items-center justify-center gap-3">
                 {feedbackMessage && (
                   <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
                     boardError
@@ -1098,9 +1098,23 @@ function App() {
                 )}
               </div>
 
+              {/* Dynamic Progress Bar */}
+              <div className="w-full max-w-[560px] mb-4 space-y-1.5 animate-fadeIn">
+                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 dark:text-neutral-450 px-1 tracking-wider">
+                  <span>VARIATION PROGRESS</span>
+                  <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
+                </div>
+                <div className="w-full h-2.5 bg-neutral-200 dark:bg-neutral-800/80 rounded-full overflow-hidden border border-neutral-300/10 dark:border-neutral-700/10 shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-brand-primary/60 via-brand-primary to-brand-primary/95 rounded-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(140,106,92,0.3)]"
+                    style={{ width: `${(currentIndex / currentVariant.moves.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
               {/* Chessboard container with Error/Success borders */}
               <div
-                className={`w-full max-w-[480px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
+                className={`w-full max-w-[560px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
                   boardError 
                     ? 'border-red-500/80 scale-[0.99] shake-animation' 
                     : isCompleted 
@@ -1122,7 +1136,7 @@ function App() {
 
               {/* Victory Overlay Panel */}
               {isCompleted && (
-                <div className="w-full max-w-[480px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
+                <div className="w-full max-w-[560px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
                   <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
                     <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
                     Excellent! You memorized the variation
