@@ -58,12 +58,22 @@ const extractMovesFromPgn = (movesText: string): MoveNode[] => {
   const tempChess = new Chess();
   const moves: MoveNode[] = [];
   
-  // Clean movesText: remove comments and move numbers for tokenization
-  const cleanMovesText = movesText
-    .replace(/\{[^}]*\}/g, '') // remove comments
-    .replace(/\d+\.+\s*/g, '') // remove numbers like "1."
-    .replace(/\s+/g, ' ') // normalize spaces
-    .trim();
+  // 1. Remove Lichess eval and graphical tags like [%eval 0.25] or [%cal Ga2a3]
+  let cleanMovesText = movesText.replace(/\[%[^\]]*\]/g, '');
+
+  // 2. Remove all nested parenthetical variations (recursively for nested parenthesis)
+  while (cleanMovesText.includes('(')) {
+    cleanMovesText = cleanMovesText.replace(/\([^()]*\)/g, '');
+  }
+
+  // 3. Remove PGN comments enclosed in { ... }
+  cleanMovesText = cleanMovesText.replace(/\{[^}]*\}/g, '');
+
+  // 4. Remove move numbers like "1." or "1..." or "12."
+  cleanMovesText = cleanMovesText.replace(/\d+\.+\s*/g, '');
+
+  // 5. Normalize spaces
+  cleanMovesText = cleanMovesText.replace(/\s+/g, ' ').trim();
 
   const moveTokens = cleanMovesText.split(' ');
   
@@ -74,21 +84,21 @@ const extractMovesFromPgn = (movesText: string): MoveNode[] => {
     try {
       const move = tempChess.move(token);
       if (move) {
-        // Extract comment associated with this move if it exists in original text
+        // Extract comment associated with this move token in the original movesText
         let comment: string | undefined = undefined;
         const tokenEscaped = token.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-        // Match token followed by an optional space and a comment block {Comment}
         const searchRegex = new RegExp(tokenEscaped + '\\s*\\{([^}]+)\\}');
         const match = movesText.match(searchRegex);
         if (match) {
-          comment = match[1].trim();
+          // Exclude any [%eval] tags from the comment
+          comment = match[1].replace(/\[%[^\]]*\]/g, '').trim();
         }
 
         moves.push({
           from: move.from,
           to: move.to,
           notation: move.san,
-          comment: comment
+          comment: comment || undefined
         });
       }
     } catch (err) {
