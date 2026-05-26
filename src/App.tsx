@@ -13,6 +13,7 @@ import {
   Compass,
   Zap,
   Info,
+  Layers,
   Search,
   ChevronDown
 } from 'lucide-react';
@@ -190,7 +191,7 @@ const convertPgnToVariants = (chapterIndex: number, game: ParsedPgnGame): Openin
 function App() {
   // --- Available Variants State ---
   const [variants, setVariants] = useState<OpeningVariant[]>(OPENING_VARIANTS);
-  const [activeCategory, setActiveCategory] = useState<'all' | 'vienna' | 'default'>('all');
+  const [activeView, setActiveView] = useState<'menu' | 'vienna-directory'>('menu');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedChapters, setExpandedChapters] = useState<{ [key: string]: boolean }>({});
 
@@ -451,6 +452,11 @@ function App() {
 
   // Group Vienna Variations for filtering stats
   const viennaVariants = variants.filter(v => v.openingName === 'Vienna Repertoire');
+  
+  // Stats specifically for Vienna Repertoire
+  const viennaAttempts = viennaVariants.reduce((acc, curr) => acc + (userProgress[curr.id]?.attempts || 0), 0);
+  const viennaSuccesses = viennaVariants.reduce((acc, curr) => acc + (userProgress[curr.id]?.successes || 0), 0);
+  const viennaMastered = viennaVariants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
 
   // Dynamically group variants into Chapters
   const chapters = useMemo(() => {
@@ -514,22 +520,23 @@ function App() {
     return [...list, ...viennaChaptersList];
   }, [variants, viennaVariants]);
 
-  // Filter chapters based on search query and active category
-  const filteredChapters = useMemo(() => {
-    return chapters.filter(ch => {
-      // Filter by category tab
-      if (activeCategory === 'vienna' && ch.category !== 'Vienna Repertoire') return false;
-      if (activeCategory === 'default' && ch.category !== 'Default Repertoire') return false;
+  // Extract default and Vienna chapters specifically
+  const defaultChapters = useMemo(() => {
+    return chapters.filter(ch => ch.category === 'Default Repertoire');
+  }, [chapters]);
 
-      // Filter by search query text
-      const query = searchQuery.toLowerCase();
-      return (
-        ch.title.toLowerCase().includes(query) ||
-        ch.description.toLowerCase().includes(query) ||
-        ch.category.toLowerCase().includes(query)
-      );
-    });
-  }, [chapters, activeCategory, searchQuery]);
+  const viennaChapters = useMemo(() => {
+    return chapters.filter(ch => ch.category === 'Vienna Repertoire');
+  }, [chapters]);
+
+  // Filter Vienna chapters based on search query in the Vienna Directory
+  const filteredViennaChapters = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return viennaChapters.filter(ch =>
+      ch.title.toLowerCase().includes(query) ||
+      ch.description.toLowerCase().includes(query)
+    );
+  }, [viennaChapters, searchQuery]);
 
   const toggleChapterExpand = (chapterId: string) => {
     setExpandedChapters(prev => ({
@@ -543,7 +550,7 @@ function App() {
       
       {/* HEADER */}
       <header className="border-b border-neutral-200 dark:border-neutral-800 py-4 px-6 md:px-12 flex justify-between items-center bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm">
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { resetToMenu(); setActiveCategory('all'); setSearchQuery(''); }}>
+        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { resetToMenu(); setActiveView('menu'); setSearchQuery(''); }}>
           <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-bold text-lg shadow-sm">
             C
           </div>
@@ -765,8 +772,8 @@ function App() {
             </div>
 
           </div>
-        ) : (
-          /* ================= 2. MAIN MENU VIEW (RESTORED SELECTABLE CHAPTERS + SEARCH & FILTER) ================= */
+        ) : activeView === 'menu' ? (
+          /* ================= 2. CLEAN MAIN MENU VIEW (Najdorf, Caro-Kann, Berlin, Vienna Card) ================= */
           <div className="space-y-8 animate-fadeIn">
             {/* Welcome Banner / Global Stats */}
             <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
@@ -798,212 +805,313 @@ function App() {
               </div>
             </div>
 
-            {/* Repertoire Categories, Search & Selection Grid */}
-            <div className="space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-                  <Compass size={18} className="text-brand-primary" />
-                  Elegir Capítulo de Estudio
-                </h3>
-                
-                {/* Search Bar */}
-                <div className="relative max-w-xs w-full">
-                  <Search className="absolute left-3 top-2.5 text-neutral-400" size={14} />
-                  <input
-                    type="text"
-                    placeholder="Buscar capítulos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-4 py-1.5 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-lg text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-primary transition-all text-brand-dark dark:text-brand-secondary placeholder-neutral-400"
-                  />
-                </div>
-              </div>
+            {/* Repertoire Categories & Clean Grid */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                <Compass size={18} className="text-brand-primary" />
+                Elige un Repertorio de Aperturas
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* A. Default Repertoires */}
+                {defaultChapters.map((chapter) => {
+                  const variant = chapter.variants[0];
+                  const progress = userProgress[variant.id];
+                  const hasCompletedDemo = progress?.demoCompleted ?? false;
+                  const practiceCount = progress?.successes ?? 0;
 
-              {/* Category Filter Tabs */}
-              <div className="flex overflow-x-auto gap-2 bg-neutral-100 dark:bg-neutral-855 p-1 rounded-lg border border-neutral-200/50 dark:border-neutral-800/50 max-w-max">
-                <button
-                  onClick={() => setActiveCategory('all')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                    activeCategory === 'all'
-                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
-                  }`}
-                >
-                  Todos ({chapters.length})
-                </button>
-                <button
-                  onClick={() => setActiveCategory('vienna')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                    activeCategory === 'vienna'
-                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
-                  }`}
-                >
-                  Repertorio Viena ({viennaVariants.length} líneas)
-                </button>
-                <button
-                  onClick={() => setActiveCategory('default')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                    activeCategory === 'default'
-                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
-                  }`}
-                >
-                  Predeterminados
-                </button>
-              </div>
-
-              {/* Grid of Selectable Chapter Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredChapters.length > 0 ? (
-                  filteredChapters.map((chapter) => {
-                    const totalSuccesses = chapter.variants.reduce((acc, v) => acc + (userProgress[v.id]?.successes || 0), 0);
-                    const masteredCount = chapter.variants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
-                    const isAllMastered = masteredCount === chapter.variants.length;
-
-                    return (
-                      <div
-                        key={chapter.id}
-                        className={`bg-white dark:bg-neutral-900 border rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden ${
-                          chapter.category === 'Vienna Repertoire'
-                            ? 'border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/45 dark:hover:border-brand-primary/30'
-                            : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700'
-                        }`}
-                      >
-                        {chapter.category === 'Vienna Repertoire' && (
-                          <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
-                        )}
-                        
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-start gap-2">
-                            <div>
-                              <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
-                                {chapter.category === 'Vienna Repertoire' && chapter.chapterIndex 
-                                  ? `Capítulo ${chapter.chapterIndex} • Viena` 
-                                  : chapter.category}
-                              </span>
-                              <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
-                                {chapter.title}
-                              </h4>
-                            </div>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-                              chapter.side === 'white'
-                                ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
-                                : 'bg-brand-dark text-white border border-brand-dark'
-                            }`}>
-                              {chapter.side === 'white' ? 'Blancas' : 'Negras'}
+                  return (
+                    <div
+                      key={chapter.id}
+                      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
+                              {variant.openingName}
                             </span>
+                            <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
                           </div>
-                          
-                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
-                            {chapter.description}
-                          </p>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${
+                            variant.side === 'white'
+                              ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
+                              : 'bg-brand-dark text-white border border-brand-dark'
+                          }`}>
+                            {variant.side === 'white' ? 'Blancas' : 'Negras'}
+                          </span>
                         </div>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
+                          {variant.description}
+                        </p>
+                      </div>
 
-                        {/* Cards Action and Details */}
-                        <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
-                          {chapter.variants.length === 1 ? (
-                            /* Case A: Only 1 variation (e.g. default Najdorf, Caro-Kann, Berlin, etc.) */
-                            <div className="flex justify-between items-center gap-4">
-                              <div className="flex items-center space-x-2 text-[10px]">
-                                {userProgress[chapter.variants[0].id]?.demoCompleted ? (
-                                  <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                                    <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
-                                  </span>
-                                ) : (
-                                  <span className="text-neutral-400 font-medium flex items-center">
-                                    <Info size={12} className="mr-0.5" /> Demo Pendiente
-                                  </span>
-                                )}
-                                {totalSuccesses > 0 && (
-                                  <span className="text-brand-primary font-bold">
-                                    {totalSuccesses}x
-                                  </span>
-                                )}
-                              </div>
-
-                              <button
-                                onClick={() => startVariant(chapter.variants[0])}
-                                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                              >
-                                <Play size={12} className="fill-white" /> Entrenar
-                              </button>
-                            </div>
+                      <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
+                        <div className="flex items-center space-x-3 text-xs">
+                          {hasCompletedDemo ? (
+                            <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                              <CheckCircle2 size={14} className="mr-1" /> Demo OK
+                            </span>
                           ) : (
-                            /* Case B: Multiple variations (Chapters parsed from PGN with subvariations) */
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-neutral-400 font-semibold">
-                                  {masteredCount} / {chapter.variants.length} Dominados
-                                </span>
-                                {isAllMastered && (
-                                  <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
-                                    <Award size={12} className="mr-0.5" /> ¡Dominado!
-                                  </span>
-                                )}
-                              </div>
+                            <span className="text-neutral-400 font-medium flex items-center">
+                              <Info size={14} className="mr-1" /> Demo Pendiente
+                            </span>
+                          )}
 
-                              <div className="flex justify-between items-center gap-2 pt-1">
-                                <span className="text-[11px] text-neutral-500 font-medium dark:text-neutral-400">
-                                  {chapter.variants.length} subvariantes
-                                </span>
-                                
-                                <button
-                                  onClick={() => toggleChapterExpand(chapter.id)}
-                                  className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
-                                >
-                                  <span>{expandedChapters[chapter.id] ? 'Ocultar' : 'Elegir Variante'}</span>
-                                  <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
-                                </button>
-                              </div>
-
-                              {/* Expanded Subvariations List */}
-                              {expandedChapters[chapter.id] && (
-                                <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
-                                  {chapter.variants.map((variant) => {
-                                    const prog = userProgress[variant.id];
-                                    const isDemoDone = prog?.demoCompleted ?? false;
-                                    const successes = prog?.successes ?? 0;
-                                    return (
-                                      <div
-                                        key={variant.id}
-                                        className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
-                                      >
-                                        <div className="space-y-0.5 pr-2 max-w-[70%]">
-                                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                                            {variant.name}
-                                          </div>
-                                          <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
-                                            <span>{variant.moves.length} jugadas</span>
-                                            {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
-                                            {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => startVariant(variant)}
-                                          className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
-                                        >
-                                          <Play size={10} className="fill-white" /> Entrenar
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
+                          {practiceCount > 0 && (
+                            <span className="text-brand-primary font-semibold">
+                              {practiceCount}x Completado
+                            </span>
                           )}
                         </div>
 
+                        <button
+                          onClick={() => startVariant(variant)}
+                          className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center cursor-pointer"
+                        >
+                          <Play size={12} className="mr-1 fill-white" /> Entrenar
+                        </button>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl">
-                    <Compass className="mx-auto text-neutral-350 mb-3 animate-pulse" size={36} />
-                    <p className="text-sm font-medium">No se encontraron capítulos que coincidan con tu búsqueda</p>
+                    </div>
+                  );
+                })}
+
+                {/* B. Vienna Repertoire Card (PREMIUM DYNAMIC CATEGORY LINK) */}
+                {viennaVariants.length > 0 && (
+                  <div
+                    className="bg-white dark:bg-neutral-900 border-2 border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/50 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase flex items-center gap-1">
+                            <Layers size={11} /> Estudio dinámico PGN
+                          </span>
+                          <h4 className="text-lg font-black tracking-tight mt-0.5">Repertorio Apertura de Viena</h4>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                          Blancas y Negras
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
+                        Estudio completo y estructurado de la Apertura de Viena cargado en tiempo real desde tu PGN.
+                        Contiene **{viennaChapters.length} capítulos** seleccionables con todas las subvariaciones anidadas.
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
+                      <div className="flex items-center space-x-3 text-xs">
+                        <span className="text-neutral-400 font-medium">
+                          {viennaMastered} / {viennaVariants.length} Dominados
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveView('vienna-directory')}
+                        className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center cursor-pointer font-bold"
+                      >
+                        <Compass size={12} className="mr-1" /> Elegir Capítulos
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        ) : (
+          /* ================= 3. DEDICATED VIENNA DIRECTORY EXPLORER VIEW ================= */
+          <div className="space-y-6 animate-fadeIn">
+            {/* Navigation and Title */}
+            <div>
+              <button
+                onClick={() => { setActiveView('menu'); setSearchQuery(''); }}
+                className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer mb-3"
+              >
+                <ArrowLeft size={14} className="mr-1" />
+                Volver al Menú Principal
+              </button>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-extrabold tracking-tight">Directorio de Viena</h2>
+                  <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
+                    Explora, selecciona y entrena las subvariantes y capítulos analizados de tu estudio de Viena.
+                  </p>
+                </div>
+
+                {/* Vienna Specific Stats Banner */}
+                <div className="flex gap-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 rounded-lg text-xs font-medium shadow-sm">
+                  <div>
+                    <span className="text-neutral-450 font-semibold block">Intentos Viena</span>
+                    <span className="text-sm font-black">{viennaAttempts}</span>
+                  </div>
+                  <div className="border-l border-neutral-200 dark:border-neutral-800 pl-4">
+                    <span className="text-neutral-450 font-semibold block">Éxitos Viena</span>
+                    <span className="text-sm font-black">{viennaSuccesses}</span>
+                  </div>
+                  <div className="border-l border-neutral-200 dark:border-neutral-800 pl-4">
+                    <span className="text-brand-primary font-semibold block">Variantes Dominadas</span>
+                    <span className="text-sm font-black text-brand-primary">{viennaMastered} / {viennaVariants.length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar capítulos de Viena..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-primary transition-all text-brand-dark dark:text-brand-secondary placeholder-neutral-400"
+              />
+            </div>
+
+            {/* Grid of Selectable Chapter Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredViennaChapters.length > 0 ? (
+                filteredViennaChapters.map((chapter) => {
+                  const totalSuccesses = chapter.variants.reduce((acc, v) => acc + (userProgress[v.id]?.successes || 0), 0);
+                  const masteredCount = chapter.variants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
+                  const isAllMastered = masteredCount === chapter.variants.length;
+
+                  return (
+                    <div
+                      key={chapter.id}
+                      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
+                      
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
+                              Capítulo {chapter.chapterIndex} • Apertura de Viena
+                            </span>
+                            <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
+                              {chapter.title}
+                            </h4>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
+                            chapter.side === 'white'
+                              ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
+                              : 'bg-brand-dark text-white border border-brand-dark'
+                          }`}>
+                            {chapter.side === 'white' ? 'Blancas' : 'Negras'}
+                          </span>
+                        </div>
+                        
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
+                          {chapter.description}
+                        </p>
+                      </div>
+
+                      {/* Chapter Action Details */}
+                      <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                        {chapter.variants.length === 1 ? (
+                          /* Case A: Chapter only has 1 line */
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex items-center space-x-2 text-[10px]">
+                              {userProgress[chapter.variants[0].id]?.demoCompleted ? (
+                                <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                                  <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
+                                </span>
+                              ) : (
+                                <span className="text-neutral-400 font-medium flex items-center">
+                                  <Info size={12} className="mr-0.5" /> Demo Pendiente
+                                </span>
+                              )}
+                              {totalSuccesses > 0 && (
+                                <span className="text-brand-primary font-bold">
+                                  {totalSuccesses}x
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => startVariant(chapter.variants[0])}
+                              className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                            >
+                              <Play size={12} className="fill-white" /> Entrenar
+                            </button>
+                          </div>
+                        ) : (
+                          /* Case B: Chapter has multiple subvariations */
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-neutral-400 font-semibold">
+                                {masteredCount} / {chapter.variants.length} Dominados
+                              </span>
+                              {isAllMastered && (
+                                <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
+                                  <Award size={12} className="mr-0.5" /> ¡Dominado!
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex justify-between items-center gap-2 pt-1">
+                              <span className="text-[11px] text-neutral-500 font-medium dark:text-neutral-400">
+                                {chapter.variants.length} subvariantes
+                              </span>
+                              
+                              <button
+                                onClick={() => toggleChapterExpand(chapter.id)}
+                                className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                              >
+                                <span>{expandedChapters[chapter.id] ? 'Ocultar' : 'Elegir Variante'}</span>
+                                <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
+                              </button>
+                            </div>
+
+                            {/* Expanded Subvariations List */}
+                            {expandedChapters[chapter.id] && (
+                              <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
+                                {chapter.variants.map((variant) => {
+                                  const prog = userProgress[variant.id];
+                                  const isDemoDone = prog?.demoCompleted ?? false;
+                                  const successes = prog?.successes ?? 0;
+                                  return (
+                                    <div
+                                      key={variant.id}
+                                      className="flex items-center justify-between p-2 rounded-lg bg-neutral-55 dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
+                                    >
+                                      <div className="space-y-0.5 pr-2 max-w-[70%]">
+                                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                                          {variant.name}
+                                        </div>
+                                        <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
+                                          <span>{variant.moves.length} jugadas</span>
+                                          {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
+                                          {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => startVariant(variant)}
+                                        className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
+                                      >
+                                        <Play size={10} className="fill-white" /> Entrenar
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl">
+                  <Compass className="mx-auto text-neutral-350 mb-3 animate-pulse" size={36} />
+                  <p className="text-sm font-medium">No se encontraron capítulos que coincidan con tu búsqueda</p>
+                </div>
+              )}
             </div>
           </div>
         )}
