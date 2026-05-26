@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import {
@@ -12,7 +12,9 @@ import {
   Moon,
   Compass,
   Zap,
-  Info
+  Info,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 import { OPENING_VARIANTS } from './data/openings';
 import { OpeningVariant, UserProgress, MoveNode } from './types';
@@ -27,7 +29,7 @@ interface ParsedPgnGame {
   movesText: string;
 }
 
-// Splits PGN string into individual game blocks
+// Splits PGN string into individual game/chapter blocks
 const parsePgnFile = (pgnString: string): ParsedPgnGame[] => {
   const games: ParsedPgnGame[] = [];
   // Split games by standard PGN event header block
@@ -53,85 +55,144 @@ const parsePgnFile = (pgnString: string): ParsedPgnGame[] => {
   return games;
 };
 
-// Robust regex-based PGN moves and comments extractor
-const extractMovesFromPgn = (movesText: string): MoveNode[] => {
-  const tempChess = new Chess();
-  const moves: MoveNode[] = [];
-  
+// Recursive backtracking parser to extract all unique branches/subvariations
+const parsePgnToLines = (movesText: string): MoveNode[][] => {
   // 1. Remove Lichess eval and graphical tags like [%eval 0.25] or [%cal Ga2a3]
-  let cleanMovesText = movesText.replace(/\[%[^\]]*\]/g, '');
-
-  // 2. Remove all nested parenthetical variations (recursively for nested parenthesis)
-  while (cleanMovesText.includes('(')) {
-    cleanMovesText = cleanMovesText.replace(/\([^()]*\)/g, '');
-  }
-
-  // 3. Remove PGN comments enclosed in { ... }
-  cleanMovesText = cleanMovesText.replace(/\{[^}]*\}/g, '');
-
-  // 4. Remove move numbers like "1." or "1..." or "12."
-  cleanMovesText = cleanMovesText.replace(/\d+\.+\s*/g, '');
-
-  // 5. Normalize spaces
-  cleanMovesText = cleanMovesText.replace(/\s+/g, ' ').trim();
-
-  const moveTokens = cleanMovesText.split(' ');
+  const cleanText = movesText.replace(/\[%[^\]]*\]/g, '');
   
-  for (let i = 0; i < moveTokens.length; i++) {
-    const token = moveTokens[i];
-    if (!token || token === '*' || token === '1-0' || token === '0-1' || token === '1/2-1/2') continue;
+  const lines: MoveNode[][] = [];
+  
+  const recurse = (text: string, currentPath: MoveNode[], tempChess: Chess) => {
+    let index = 0;
+    const tokens = text.match(/(\(|\)|\{[^}]*\}|\d+\.+\s*|[a-zA-Z0-9#+=x-]+)/g) || [];
     
-    try {
-      const move = tempChess.move(token);
-      if (move) {
-        // Extract comment associated with this move token in the original movesText
-        let comment: string | undefined = undefined;
-        const tokenEscaped = token.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const searchRegex = new RegExp(tokenEscaped + '\\s*\\{([^}]+)\\}');
-        const match = movesText.match(searchRegex);
-        if (match) {
-          // Exclude any [%eval] tags from the comment
-          comment = match[1].replace(/\[%[^\]]*\]/g, '').trim();
-        }
-
-        moves.push({
-          from: move.from,
-          to: move.to,
-          notation: move.san,
-          comment: comment || undefined
-        });
+    const localChess = new Chess(tempChess.fen());
+    const localPath = [...currentPath];
+    
+    while (index < tokens.length) {
+      const token = tokens[index].trim();
+      index++;
+      
+      if (!token || /^\d+\.+/.test(token) || token === '*' || token === '1-0' || token === '0-1' || token === '1/2-1/2') {
+        continue;
       }
-    } catch (err) {
-      console.warn(`Skipping invalid move token "${token}":`, err);
-      break; // stop parsing this line if a move is invalid
+      
+      if (token.startsWith('{')) {
+        // Comment for the last move
+        const comment = token.slice(1, -1).trim();
+        if (localPath.length > 0 && comment) {
+          localPath[localPath.length - 1].comment = comment;
+        }
+        continue;
+      }
+      
+      if (token === '(') {
+        // A branch starts! Find matching closing parenthesis
+        let depth = 1;
+        const branchStart = index;
+        while (index < tokens.length && depth > 0) {
+          if (tokens[index].trim() === '(') depth++;
+          if (tokens[index].trim() === ')') depth--;
+          index++;
+        }
+        
+        const branchTokens = tokens.slice(branchStart, index - 1);
+        const branchText = branchTokens.join(' ');
+        
+        // The branch is an alternative to the LAST move in localPath
+        if (localPath.length > 0) {
+          const parentPath = localPath.slice(0, -1);
+          const parentChess = new Chess();
+          for (const m of parentPath) {
+            parentChess.move({ from: m.from, to: m.to, promotion: 'q' });
+          }
+          
+          recurse(branchText, parentPath, parentChess);
+        }
+        continue;
+      }
+      
+      if (token === ')') {
+        continue;
+      }
+      
+      // It is a standard move
+      try {
+        const move = localChess.move(token);
+        if (move) {
+          let comment: string | undefined = undefined;
+          if (index < tokens.length && tokens[index].trim().startsWith('{')) {
+            comment = tokens[index].trim().slice(1, -1).trim();
+            index++;
+          }
+          
+          localPath.push({
+            from: move.from,
+            to: move.to,
+            notation: move.san,
+            comment: comment || undefined
+          });
+        }
+      } catch (err) {
+        console.warn(`Skipping invalid move token "${token}":`, err);
+        break;
+      }
     }
-  }
-
-  return moves;
+    
+    if (localPath.length > 0) {
+      lines.push(localPath);
+    }
+  };
+  
+  recurse(cleanText, [], new Chess());
+  return lines;
 };
 
-// Converts a parsed PGN game block to our OpeningVariant format
-const convertPgnToVariant = (id: string, game: ParsedPgnGame): OpeningVariant | null => {
-  const event = game.headers['Event'] || 'Vienna Opening Line';
+// Converts a parsed PGN game block to our OpeningVariant format (extracting all unique paths)
+const convertPgnToVariants = (chapterIndex: number, game: ParsedPgnGame): OpeningVariant[] => {
+  const event = game.headers['Event'] || game.headers['ChapterName'] || `Chapter ${chapterIndex}`;
   const side = (game.headers['Side'] || 'white').toLowerCase() as 'white' | 'black';
   const description = game.headers['Description'] || `Practice the ${event}.`;
 
-  const moves = extractMovesFromPgn(game.movesText);
-  if (moves.length === 0) return null;
+  const lines = parsePgnToLines(game.movesText);
+  const variants: OpeningVariant[] = [];
 
-  return {
-    id,
-    openingName: 'Vienna Opening',
-    name: event,
-    description,
-    side,
-    moves
-  };
+  lines.forEach((moves, lineIndex) => {
+    if (moves.length === 0) return;
+
+    let variantName = event;
+    if (lines.length > 1) {
+      if (lineIndex === 0) {
+        variantName = `Main Line`;
+      } else {
+        const lastMove = moves[moves.length - 1];
+        variantName = `var. ${lastMove.notation}`;
+      }
+    } else {
+      variantName = `Main Line`;
+    }
+
+    variants.push({
+      id: `vienna-pgn-ch${chapterIndex}-line${lineIndex}`,
+      openingName: 'Vienna Repertoire',
+      name: variantName,
+      description,
+      side,
+      moves,
+      chapterName: event,
+      chapterIndex
+    });
+  });
+
+  return variants;
 };
 
 function App() {
   // --- Available Variants State ---
   const [variants, setVariants] = useState<OpeningVariant[]>(OPENING_VARIANTS);
+  const [activeCategory, setActiveCategory] = useState<'all' | 'vienna' | 'default'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedChapters, setExpandedChapters] = useState<{ [key: string]: boolean }>({});
 
   // --- Navigation & Theme State ---
   const [currentVariant, setCurrentVariant] = useState<OpeningVariant | null>(null);
@@ -171,10 +232,8 @@ function App() {
         const parsedVariants: OpeningVariant[] = [];
         
         parsedGames.forEach((gameBlock, index) => {
-          const variant = convertPgnToVariant(`vienna-pgn-${index}`, gameBlock);
-          if (variant) {
-            parsedVariants.push(variant);
-          }
+          const variantsFromChapter = convertPgnToVariants(index + 1, gameBlock);
+          parsedVariants.push(...variantsFromChapter);
         });
 
         if (parsedVariants.length > 0) {
@@ -390,12 +449,101 @@ function App() {
   const totalSuccesses = Object.values(userProgress).reduce((acc, curr) => acc + curr.successes, 0);
   const masteredOpenings = Object.values(userProgress).filter(p => p.successes > 0).length;
 
+  // Group Vienna Variations for filtering stats
+  const viennaVariants = variants.filter(v => v.openingName === 'Vienna Repertoire');
+
+  // Dynamically group variants into Chapters
+  const chapters = useMemo(() => {
+    const list: {
+      id: string;
+      title: string;
+      category: string;
+      description: string;
+      side: 'white' | 'black';
+      variants: OpeningVariant[];
+      chapterIndex?: number;
+    }[] = [];
+
+    // A. Group default variants
+    const defaultVariants = variants.filter(v => v.openingName !== 'Vienna Repertoire');
+    defaultVariants.forEach(v => {
+      list.push({
+        id: v.id,
+        title: `${v.openingName}: ${v.name}`,
+        category: 'Default Repertoire',
+        description: v.description,
+        side: v.side,
+        variants: [v]
+      });
+    });
+
+    // B. Group Vienna variants by chapterName
+    const viennaGroups: { [key: string]: OpeningVariant[] } = {};
+    viennaVariants.forEach(v => {
+      const chName = v.chapterName || 'General Repertoire';
+      if (!viennaGroups[chName]) {
+        viennaGroups[chName] = [];
+      }
+      viennaGroups[chName].push(v);
+    });
+
+    // Convert Vienna groups to chapters, sorted by chapterIndex
+    const viennaChaptersList = Object.keys(viennaGroups).map(chName => {
+      const groupVariants = viennaGroups[chName];
+      // Sort variants: Main Line (lineIndex 0) is first
+      const sortedGroup = [...groupVariants].sort((a, b) => {
+        const aIdx = parseInt(a.id.split('-line')[1]) || 0;
+        const bIdx = parseInt(b.id.split('-line')[1]) || 0;
+        return aIdx - bIdx;
+      });
+      const firstVar = sortedGroup[0];
+      return {
+        id: `vienna-ch-${firstVar.chapterIndex || 0}`,
+        title: chName,
+        category: 'Vienna Repertoire',
+        description: firstVar.description,
+        side: firstVar.side,
+        variants: sortedGroup,
+        chapterIndex: firstVar.chapterIndex
+      };
+    });
+
+    // Sort Vienna chapters by chapterIndex
+    viennaChaptersList.sort((a, b) => (a.chapterIndex || 0) - (b.chapterIndex || 0));
+
+    return [...list, ...viennaChaptersList];
+  }, [variants, viennaVariants]);
+
+  // Filter chapters based on search query and active category
+  const filteredChapters = useMemo(() => {
+    return chapters.filter(ch => {
+      // Filter by category tab
+      if (activeCategory === 'vienna' && ch.category !== 'Vienna Repertoire') return false;
+      if (activeCategory === 'default' && ch.category !== 'Default Repertoire') return false;
+
+      // Filter by search query text
+      const query = searchQuery.toLowerCase();
+      return (
+        ch.title.toLowerCase().includes(query) ||
+        ch.description.toLowerCase().includes(query) ||
+        ch.category.toLowerCase().includes(query)
+      );
+    });
+  }, [chapters, activeCategory, searchQuery]);
+
+  const toggleChapterExpand = (chapterId: string) => {
+    setExpandedChapters(prev => ({
+      ...prev,
+      [chapterId]: !prev[chapterId]
+    }));
+  };
+
   return (
     <div className="min-h-screen transition-colors duration-300 bg-brand-bg-light dark:bg-brand-bg-dark text-brand-dark dark:text-brand-secondary flex flex-col justify-between">
       
       {/* HEADER */}
       <header className="border-b border-neutral-200 dark:border-neutral-800 py-4 px-6 md:px-12 flex justify-between items-center bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm">
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={resetToMenu}>
+        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { resetToMenu(); setActiveCategory('all'); setSearchQuery(''); }}>
           <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-bold text-lg shadow-sm">
             C
           </div>
@@ -438,116 +586,8 @@ function App() {
       {/* CORE CONTENT */}
       <main className="flex-grow max-w-6xl w-full mx-auto p-6 md:p-8 flex flex-col justify-center">
         
-        {!currentVariant ? (
-          /* ================= MENU VIEW ================= */
-          <div className="space-y-8 animate-fadeIn">
-            {/* Welcome Banner / Global Stats */}
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
-              <div className="space-y-2 max-w-2xl">
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-primary/10 text-brand-primary">
-                  Memory & Repetitions
-                </span>
-                <h2 className="text-2xl font-bold tracking-tight">Master Your Chess Openings</h2>
-                <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed">
-                  ChessOp helps you absorb the best chess variations through muscle memory and active recall.
-                  Learn theory with guided visual arrows, then practice completely from memory.
-                </p>
-              </div>
-
-              {/* Quick Stats Panel */}
-              <div className="grid grid-cols-3 gap-4 md:border-l border-neutral-200 dark:border-neutral-800 md:pl-8 min-w-[280px]">
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Attempts</span>
-                  <span className="text-2xl font-bold">{totalAttempts}</span>
-                </div>
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Completed</span>
-                  <span className="text-2xl font-bold">{totalSuccesses}</span>
-                </div>
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Mastered</span>
-                  <span className="text-2xl font-bold text-brand-primary">{masteredOpenings}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Available Variations */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-                <Compass size={18} className="text-brand-primary" />
-                Available Variations
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {variants.map((variant) => {
-                  const progress = userProgress[variant.id];
-                  const hasCompletedDemo = progress?.demoCompleted ?? false;
-                  const practiceCount = progress?.successes ?? 0;
-
-                  return (
-                    <div
-                      key={variant.id}
-                      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
-                              {variant.openingName}
-                            </span>
-                            <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
-                          </div>
-                          
-                          {/* Trained Side Badge */}
-                          <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                            variant.side === 'white' 
-                              ? 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200' 
-                              : 'bg-brand-dark text-white'
-                          }`}>
-                            {variant.side === 'white' ? 'White' : 'Black'}
-                          </span>
-                        </div>
-
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                          {variant.description}
-                        </p>
-                      </div>
-
-                      {/* Individual Progress & CTA */}
-                      <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
-                        <div className="flex items-center space-x-3 text-xs">
-                          {hasCompletedDemo ? (
-                            <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                              <CheckCircle2 size={14} className="mr-1" /> Demo OK
-                            </span>
-                          ) : (
-                            <span className="text-neutral-400 font-medium flex items-center">
-                              <Info size={14} className="mr-1" /> Demo Pending
-                            </span>
-                          )}
-
-                          {practiceCount > 0 && (
-                            <span className="text-brand-primary font-semibold">
-                              {practiceCount}x Completed
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => startVariant(variant)}
-                          className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center cursor-pointer"
-                        >
-                          <Play size={12} className="mr-1 fill-white" /> Train
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ================= TRAINING VIEW ================= */
+        {currentVariant ? (
+          /* ================= 1. TRAINING VIEW ================= */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-5xl mx-auto w-full animate-fadeIn">
             
             {/* SIDE CONTROL PANEL */}
@@ -560,28 +600,31 @@ function App() {
                   className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer"
                 >
                   <ArrowLeft size={14} className="mr-1" />
-                  Back to menu
+                  Volver al menú
                 </button>
                 
                 <div>
                   <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
                     {currentVariant.openingName}
                   </span>
-                  <h3 className="text-2xl font-black tracking-tight">{currentVariant.name}</h3>
+                  <h3 className="text-xl font-black tracking-tight leading-tight">{currentVariant.chapterName || currentVariant.name}</h3>
+                  {currentVariant.chapterName && (
+                    <span className="text-xs text-neutral-400 font-medium block mt-0.5">{currentVariant.name}</span>
+                  )}
                 </div>
               </div>
 
               {/* Toggles & Modes */}
               <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4 shadow-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Side</span>
+                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Lado</span>
                   <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">
-                    Playing as {currentVariant.side === 'white' ? 'White' : 'Black'}
+                    Jugando como {currentVariant.side === 'white' ? 'Blancas' : 'Negras'}
                   </span>
                 </div>
 
                 <div className="border-t border-neutral-100 dark:border-neutral-800 pt-3">
-                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">Practice Mode</span>
+                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">Modo de Práctica</span>
                   <div className="grid grid-cols-2 gap-2 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
                     <button
                       onClick={() => {
@@ -594,7 +637,7 @@ function App() {
                           : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
                       }`}
                     >
-                      Demonstration
+                      Demostración
                     </button>
                     <button
                       onClick={() => {
@@ -607,7 +650,7 @@ function App() {
                           : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
                       }`}
                     >
-                      Practice
+                      Práctica
                     </button>
                   </div>
                 </div>
@@ -619,15 +662,15 @@ function App() {
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center">
                     <BookOpen size={12} className="mr-1 text-brand-primary" />
-                    Strategic Explanation
+                    Explicación Estratégica
                   </span>
                   <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
-                    {lastMoveComment || 'Make your first move on the board to view strategic explanations.'}
+                    {lastMoveComment || 'Haz tu primera jugada en el tablero para ver explicaciones estratégicas.'}
                   </p>
                 </div>
 
                 <div className="text-xs text-neutral-400 text-right mt-3 font-semibold">
-                  Move {Math.ceil(currentIndex / 2)} / {Math.ceil(currentVariant.moves.length / 2)}
+                  Jugada {Math.ceil(currentIndex / 2)} / {Math.ceil(currentVariant.moves.length / 2)}
                 </div>
               </div>
 
@@ -637,7 +680,7 @@ function App() {
                 className="w-full py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-xs font-bold transition-all flex items-center justify-center space-x-1 shadow-sm active:scale-95 cursor-pointer"
               >
                 <RotateCcw size={14} className="mr-1" />
-                <span>Restart line</span>
+                <span>Reiniciar línea</span>
               </button>
             </div>
 
@@ -688,12 +731,12 @@ function App() {
                 <div className="w-full max-w-[480px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
                   <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
                     <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
-                    Excellent! You memorized the variation
+                    ¡Excelente! Memorizaste la variante
                   </h4>
                   <p className="text-xs text-green-600 dark:text-green-400/80 mt-1">
                     {isDemoMode 
-                      ? 'You completed the demo. Now try it from memory!' 
-                      : 'Perfect! You have mastered this training block.'
+                      ? 'Completaste la demostración. ¡Inténtalo ahora en el modo Práctica!' 
+                      : '¡Perfecto! Has dominado este bloque de entrenamiento.'
                     }
                   </p>
                   <div className="flex gap-2 justify-center mt-3">
@@ -708,19 +751,260 @@ function App() {
                       }}
                       className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-colors cursor-pointer"
                     >
-                      {isDemoMode ? 'Try Practice Mode' : 'Practice Again'}
+                      {isDemoMode ? 'Probar Modo Práctica' : 'Practicar de nuevo'}
                     </button>
                     <button
                       onClick={resetToMenu}
                       className="px-3 py-1 rounded bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
                     >
-                      Back to Menu
+                      Volver al Menú
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
+          </div>
+        ) : (
+          /* ================= 2. MAIN MENU VIEW (RESTORED SELECTABLE CHAPTERS + SEARCH & FILTER) ================= */
+          <div className="space-y-8 animate-fadeIn">
+            {/* Welcome Banner / Global Stats */}
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+              <div className="space-y-2 max-w-2xl">
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-primary/10 text-brand-primary">
+                  Memoria y Repetición Activa
+                </span>
+                <h2 className="text-2xl font-bold tracking-tight">Domina tus Aperturas de Ajedrez</h2>
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed">
+                  ChessOp te ayuda a absorber teoría a través de memoria muscular y recuerdo activo.
+                  Aprende líneas dinámicamente con flechas guía de demostración, luego ponte a prueba.
+                </p>
+              </div>
+
+              {/* Quick Stats Panel */}
+              <div className="grid grid-cols-3 gap-4 md:border-l border-neutral-200 dark:border-neutral-800 md:pl-8 min-w-[280px]">
+                <div className="text-center md:text-left">
+                  <span className="block text-xs text-neutral-400 font-medium">Intentos</span>
+                  <span className="text-2xl font-bold">{totalAttempts}</span>
+                </div>
+                <div className="text-center md:text-left">
+                  <span className="block text-xs text-neutral-400 font-medium">Completados</span>
+                  <span className="text-2xl font-bold">{totalSuccesses}</span>
+                </div>
+                <div className="text-center md:text-left">
+                  <span className="block text-xs text-neutral-400 font-medium">Dominados</span>
+                  <span className="text-2xl font-bold text-brand-primary">{masteredOpenings}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Repertoire Categories, Search & Selection Grid */}
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                  <Compass size={18} className="text-brand-primary" />
+                  Elegir Capítulo de Estudio
+                </h3>
+                
+                {/* Search Bar */}
+                <div className="relative max-w-xs w-full">
+                  <Search className="absolute left-3 top-2.5 text-neutral-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Buscar capítulos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-4 py-1.5 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-lg text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-primary transition-all text-brand-dark dark:text-brand-secondary placeholder-neutral-400"
+                  />
+                </div>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex overflow-x-auto gap-2 bg-neutral-100 dark:bg-neutral-855 p-1 rounded-lg border border-neutral-200/50 dark:border-neutral-800/50 max-w-max">
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                    activeCategory === 'all'
+                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
+                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
+                  }`}
+                >
+                  Todos ({chapters.length})
+                </button>
+                <button
+                  onClick={() => setActiveCategory('vienna')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                    activeCategory === 'vienna'
+                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
+                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
+                  }`}
+                >
+                  Repertorio Viena ({viennaVariants.length} líneas)
+                </button>
+                <button
+                  onClick={() => setActiveCategory('default')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                    activeCategory === 'default'
+                      ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary'
+                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-750'
+                  }`}
+                >
+                  Predeterminados
+                </button>
+              </div>
+
+              {/* Grid of Selectable Chapter Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredChapters.length > 0 ? (
+                  filteredChapters.map((chapter) => {
+                    const totalSuccesses = chapter.variants.reduce((acc, v) => acc + (userProgress[v.id]?.successes || 0), 0);
+                    const masteredCount = chapter.variants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
+                    const isAllMastered = masteredCount === chapter.variants.length;
+
+                    return (
+                      <div
+                        key={chapter.id}
+                        className={`bg-white dark:bg-neutral-900 border rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden ${
+                          chapter.category === 'Vienna Repertoire'
+                            ? 'border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/45 dark:hover:border-brand-primary/30'
+                            : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700'
+                        }`}
+                      >
+                        {chapter.category === 'Vienna Repertoire' && (
+                          <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
+                        )}
+                        
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
+                                {chapter.category === 'Vienna Repertoire' && chapter.chapterIndex 
+                                  ? `Capítulo ${chapter.chapterIndex} • Viena` 
+                                  : chapter.category}
+                              </span>
+                              <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
+                                {chapter.title}
+                              </h4>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
+                              chapter.side === 'white'
+                                ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
+                                : 'bg-brand-dark text-white border border-brand-dark'
+                            }`}>
+                              {chapter.side === 'white' ? 'Blancas' : 'Negras'}
+                            </span>
+                          </div>
+                          
+                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
+                            {chapter.description}
+                          </p>
+                        </div>
+
+                        {/* Cards Action and Details */}
+                        <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                          {chapter.variants.length === 1 ? (
+                            /* Case A: Only 1 variation (e.g. default Najdorf, Caro-Kann, Berlin, etc.) */
+                            <div className="flex justify-between items-center gap-4">
+                              <div className="flex items-center space-x-2 text-[10px]">
+                                {userProgress[chapter.variants[0].id]?.demoCompleted ? (
+                                  <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                                    <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
+                                  </span>
+                                ) : (
+                                  <span className="text-neutral-400 font-medium flex items-center">
+                                    <Info size={12} className="mr-0.5" /> Demo Pendiente
+                                  </span>
+                                )}
+                                {totalSuccesses > 0 && (
+                                  <span className="text-brand-primary font-bold">
+                                    {totalSuccesses}x
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={() => startVariant(chapter.variants[0])}
+                                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                              >
+                                <Play size={12} className="fill-white" /> Entrenar
+                              </button>
+                            </div>
+                          ) : (
+                            /* Case B: Multiple variations (Chapters parsed from PGN with subvariations) */
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-neutral-400 font-semibold">
+                                  {masteredCount} / {chapter.variants.length} Dominados
+                                </span>
+                                {isAllMastered && (
+                                  <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
+                                    <Award size={12} className="mr-0.5" /> ¡Dominado!
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex justify-between items-center gap-2 pt-1">
+                                <span className="text-[11px] text-neutral-500 font-medium dark:text-neutral-400">
+                                  {chapter.variants.length} subvariantes
+                                </span>
+                                
+                                <button
+                                  onClick={() => toggleChapterExpand(chapter.id)}
+                                  className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                                >
+                                  <span>{expandedChapters[chapter.id] ? 'Ocultar' : 'Elegir Variante'}</span>
+                                  <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
+                                </button>
+                              </div>
+
+                              {/* Expanded Subvariations List */}
+                              {expandedChapters[chapter.id] && (
+                                <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
+                                  {chapter.variants.map((variant) => {
+                                    const prog = userProgress[variant.id];
+                                    const isDemoDone = prog?.demoCompleted ?? false;
+                                    const successes = prog?.successes ?? 0;
+                                    return (
+                                      <div
+                                        key={variant.id}
+                                        className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
+                                      >
+                                        <div className="space-y-0.5 pr-2 max-w-[70%]">
+                                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                                            {variant.name}
+                                          </div>
+                                          <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
+                                            <span>{variant.moves.length} jugadas</span>
+                                            {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
+                                            {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => startVariant(variant)}
+                                          className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
+                                        >
+                                          <Play size={10} className="fill-white" /> Entrenar
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl">
+                    <Compass className="mx-auto text-neutral-350 mb-3 animate-pulse" size={36} />
+                    <p className="text-sm font-medium">No se encontraron capítulos que coincidan con tu búsqueda</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -729,7 +1013,7 @@ function App() {
       <footer className="border-t border-neutral-200 dark:border-neutral-800 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500 bg-white/30 dark:bg-neutral-900/30">
         <p>ChessOp &copy; 2026 - Minimal Open Source Chess Opening Repetitor.</p>
         <p className="mt-1 font-semibold text-neutral-500 dark:text-neutral-400">
-          Designed for 100% local storage and ultra low resource consumption.
+          Diseñado para 100% local storage y ultra bajo consumo de recursos.
         </p>
       </footer>
     </div>

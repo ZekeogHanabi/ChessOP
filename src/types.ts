@@ -12,6 +12,8 @@ export interface OpeningVariant {
   description: string; // Brief context or explanation
   side: 'white' | 'black'; // The side the user plays
   moves: MoveNode[]; // Ordered array of moves in this line
+  chapterName?: string; // Optional chapter name for grouped repertoires
+  chapterIndex?: number; // Optional chapter index
 }
 
 export interface UserProgress {
