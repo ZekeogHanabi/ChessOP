@@ -17,11 +17,10 @@ import {
 import { OPENING_VARIANTS } from './data/openings';
 import { OpeningVariant, UserProgress } from './types';
 
-// Explicit typings for react-chessboard v5 options
 interface PieceDropArgs {
-  piece: { isSparePiece: boolean; position: string; pieceType: string };
-  sourceSquare: string;
-  targetSquare: string | null;
+  piece?: { isSparePiece: boolean; position: string; pieceType: string };
+  sourceSquare?: string;
+  targetSquare?: string | null;
 }
 
 interface PieceDragArgs {
@@ -132,9 +131,24 @@ function App() {
     }
   };
 
-  // --- Drag & Drop Handler (API v5 single object format) ---
-  const handlePieceDrop = ({ sourceSquare, targetSquare }: PieceDropArgs): boolean => {
-    if (!currentVariant || !targetSquare || isCompleted || boardError) return false;
+  // --- Drag & Drop Handler (API v5 and v4 compatible) ---
+  const handlePieceDrop = (arg1: PieceDropArgs | string, arg2?: string): boolean => {
+    if (!currentVariant || isCompleted || boardError) return false;
+
+    let sourceSquare = '';
+    let targetSquare: string | null = null;
+
+    if (arg2 !== undefined && typeof arg1 === 'string' && typeof arg2 === 'string') {
+      // Traditional three-argument format: onPieceDrop(sourceSquare, targetSquare, piece)
+      sourceSquare = arg1;
+      targetSquare = arg2;
+    } else if (arg1 && typeof arg1 === 'object') {
+      // Destructured single object format: onPieceDrop({ piece, sourceSquare, targetSquare })
+      sourceSquare = arg1.sourceSquare || '';
+      targetSquare = arg1.targetSquare || null;
+    }
+
+    if (!sourceSquare || !targetSquare) return false;
 
     const expectedMove = currentVariant.moves[currentIndex];
     if (!expectedMove) return false;
@@ -185,7 +199,7 @@ function App() {
       }
 
       return true;
-    } catch (err) {
+    } catch {
       triggerErrorFeedback();
       return false;
     }
@@ -271,7 +285,10 @@ function App() {
       onPieceDrop: handlePieceDrop,
       boardOrientation: currentVariant.side,
       arrows: getDemoArrows(),
-      canDragPiece: ({ piece }: PieceDragArgs) => piece.pieceType[0] === currentVariant.side[0],
+      canDragPiece: (args: PieceDragArgs) => {
+        if (!args || !args.piece || !args.piece.pieceType) return false;
+        return args.piece.pieceType[0] === currentVariant.side[0];
+      },
       darkSquareStyle: { backgroundColor: 'var(--color-board-dark)' },
       lightSquareStyle: { backgroundColor: 'var(--color-board-light)' },
       animationDurationInMs: 250,
