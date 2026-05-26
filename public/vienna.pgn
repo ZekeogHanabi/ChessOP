@@ -1,0 +1,9 @@
+[Event "Vienna Game: Vienna Gambit, Main Line"]
+[Side "white"]
+[Description "The Vienna Gambit is an aggressive response after 1.e4 e5 2.Nc3. We sacrifice the f4 pawn to dominate the center and launch a devastating attack against Black's king."]
+1. e4 e5 2. Nc3 Nf6 3. f4 d5 4. fxe5 Nxe4 5. Nf3 Bc5 6. d4 Bb4 7. Bd2 *
+
+[Event "Vienna Game: Stanley Fantasy Line"]
+[Side "white"]
+[Description "A creative development after 2.Nc3. We focus on active piece development and controlling the center before expanding on the kingside."]
+1. e4 e5 2. Nc3 Nc6 3. Bc4 Bc5 4. Qg4 Qf6 5. Nd5 Qxf2+ 6. Kd1 Kf8 7. Nh3 *

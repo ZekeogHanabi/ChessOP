@@ -15,9 +15,114 @@ import {
   Info
 } from 'lucide-react';
 import { OPENING_VARIANTS } from './data/openings';
-import { OpeningVariant, UserProgress } from './types';
+import { OpeningVariant, UserProgress, MoveNode } from './types';
+
+// --- PGN Parser Helpers ---
+interface PgnHeaders {
+  [key: string]: string;
+}
+
+interface ParsedPgnGame {
+  headers: PgnHeaders;
+  movesText: string;
+}
+
+// Splits PGN string into individual game blocks
+const parsePgnFile = (pgnString: string): ParsedPgnGame[] => {
+  const games: ParsedPgnGame[] = [];
+  // Split games by standard PGN event header block
+  const gameStrings = pgnString.split(/\n(?=\[Event )/g);
+
+  for (const gameStr of gameStrings) {
+    if (!gameStr.trim()) continue;
+
+    const headers: PgnHeaders = {};
+    const headerRegex = /\[(\w+)\s+"([^"]*)"\]/g;
+    let match;
+    while ((match = headerRegex.exec(gameStr)) !== null) {
+      headers[match[1]] = match[2];
+    }
+
+    // Extract moves text (everything after headers)
+    const movesText = gameStr.replace(/\[[^\]]*\]/g, '').trim();
+    if (movesText) {
+      games.push({ headers, movesText });
+    }
+  }
+
+  return games;
+};
+
+// Robust regex-based PGN moves and comments extractor
+const extractMovesFromPgn = (movesText: string): MoveNode[] => {
+  const tempChess = new Chess();
+  const moves: MoveNode[] = [];
+  
+  // Clean movesText: remove comments and move numbers for tokenization
+  const cleanMovesText = movesText
+    .replace(/\{[^}]*\}/g, '') // remove comments
+    .replace(/\d+\.+\s*/g, '') // remove numbers like "1."
+    .replace(/\s+/g, ' ') // normalize spaces
+    .trim();
+
+  const moveTokens = cleanMovesText.split(' ');
+  
+  for (let i = 0; i < moveTokens.length; i++) {
+    const token = moveTokens[i];
+    if (!token || token === '*' || token === '1-0' || token === '0-1' || token === '1/2-1/2') continue;
+    
+    try {
+      const move = tempChess.move(token);
+      if (move) {
+        // Extract comment associated with this move if it exists in original text
+        let comment: string | undefined = undefined;
+        const tokenEscaped = token.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+        // Match token followed by an optional space and a comment block {Comment}
+        const searchRegex = new RegExp(tokenEscaped + '\\s*\\{([^}]+)\\}');
+        const match = movesText.match(searchRegex);
+        if (match) {
+          comment = match[1].trim();
+        }
+
+        moves.push({
+          from: move.from,
+          to: move.to,
+          notation: move.san,
+          comment: comment
+        });
+      }
+    } catch (err) {
+      console.warn(`Skipping invalid move token "${token}":`, err);
+      break; // stop parsing this line if a move is invalid
+    }
+  }
+
+  return moves;
+};
+
+// Converts a parsed PGN game block to our OpeningVariant format
+const convertPgnToVariant = (id: string, game: ParsedPgnGame): OpeningVariant | null => {
+  const event = game.headers['Event'] || 'Vienna Opening Line';
+  const side = (game.headers['Side'] || 'white').toLowerCase() as 'white' | 'black';
+  const description = game.headers['Description'] || `Practice the ${event}.`;
+
+  const moves = extractMovesFromPgn(game.movesText);
+  if (moves.length === 0) return null;
+
+  return {
+    id,
+    openingName: 'Vienna Opening',
+    name: event,
+    description,
+    side,
+    moves
+  };
+};
 
 function App() {
+  // --- Available Variants State ---
+  const [variants, setVariants] = useState<OpeningVariant[]>(OPENING_VARIANTS);
+
   // --- Navigation & Theme State ---
   const [currentVariant, setCurrentVariant] = useState<OpeningVariant | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -41,6 +146,36 @@ function App() {
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [lastMoveComment, setLastMoveComment] = useState<string | null>(null);
+
+  // --- Load Dynamic PGN File on Startup ---
+  useEffect(() => {
+    fetch('/vienna.pgn')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('No custom vienna.pgn found');
+        }
+        return response.text();
+      })
+      .then(text => {
+        const parsedGames = parsePgnFile(text);
+        const parsedVariants: OpeningVariant[] = [];
+        
+        parsedGames.forEach((gameBlock, index) => {
+          const variant = convertPgnToVariant(`vienna-pgn-${index}`, gameBlock);
+          if (variant) {
+            parsedVariants.push(variant);
+          }
+        });
+
+        if (parsedVariants.length > 0) {
+          // Merge default hardcoded variants with dynamically parsed PGN variants
+          setVariants([...OPENING_VARIANTS, ...parsedVariants]);
+        }
+      })
+      .catch(err => {
+        console.log('Using default opening variations (no custom public/vienna.pgn loaded):', err);
+      });
+  }, []);
 
   // --- Theme Sync Effect ---
   useEffect(() => {
@@ -226,7 +361,7 @@ function App() {
   };
 
   // --- Get Demonstration Guide Arrow (react-chessboard v4 double array shape) ---
-  const getDemoArrows = (): [string, string, string][] | undefined => {
+  const getDemoArrows = (): string[][] | undefined => {
     if (!isDemoMode || !currentVariant || isCompleted) return undefined;
 
     const expectedMove = currentVariant.moves[currentIndex];
@@ -334,7 +469,7 @@ function App() {
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {OPENING_VARIANTS.map((variant) => {
+                {variants.map((variant) => {
                   const progress = userProgress[variant.id];
                   const hasCompletedDemo = progress?.demoCompleted ?? false;
                   const practiceCount = progress?.successes ?? 0;
