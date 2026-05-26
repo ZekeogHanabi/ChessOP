@@ -1,106 +1,104 @@
-# ♟️ ChessOp - Práctica de Aperturas de Ajedrez
+# ♟️ ChessOp - Chess Opening Trainer
 
-Una aplicación web de **código abierto**, **ultra ligera** (bajo consumo de recursos) y diseñada con un enfoque **minimalista y atemporal**. Ideal para ajedrecistas que buscan memorizar y perfeccionar su repertorio de aperturas mediante repetición activa e inteligente.
+An **open-source**, **ultra-lightweight** (low resource consumption) web application designed with a **minimalist, timeless aesthetic**. Built for chess players looking to memorize and perfect their opening repertoires through active recall and muscle memory.
 
-El proyecto está diseñado al 100% para ser estático y se despliega de forma gratuita e inmediata en **Cloudflare Pages** (o GitHub Pages, Vercel, Netlify).
-
----
-
-## ✨ Características Principales
-
-1. **Aestética Minimalista y Atemporal**: Inspirada en *Chessreps*, *Lichess* e interfaces limpias como *Substack* o *Linear*. Utiliza una paleta selecta de grises suaves, blancos rotos, tonos tierra y carbón sepia. No incluye luces de neón pesadas ni animaciones futuristas agresivas.
-2. **Bajo Consumo de Recursos (Low Resources)**:
-   - Todo el estado, repertorios y el progreso se almacenan y evalúan localmente en el navegador a través de `localStorage`.
-   - Cero bases de datos, cero llamadas a APIs pesadas.
-   - Rendimiento del 100% en Lighthouse.
-3. **Bucle de Entrenamiento Eficiente**:
-   - **Modo Demostración (Interactiva)**: Muestra al usuario de forma gráfica cómo se juega la variante utilizando flechas guía dinámicas sobre el tablero. Al completarlo, el sistema registra que has aprendido la línea.
-   - **Modo Práctica**: El tablero te desafía a jugar de memoria. Si haces una jugada incorrecta o fuera del árbol teórico seleccionado, el tablero te ofrece feedback visual instantáneo (parpadeo sutil en rojo con vibración lateral ligera) e invita a reintentar.
-4. **Respuestas Automáticas**: Al realizar tu jugada teórica correcta, tras una pausa natural de 400ms, la máquina responde automáticamente con la línea preestablecida del repertorio.
-5. **Comentarios Didácticos**: Cada movimiento de la variante incluye explicaciones teóricas y educativas en tiempo real para entender el *porqué* estratégico de cada jugada.
-6. **Tema Adaptativo**: Alterna fácilmente entre el modo claro sepia suave y el modo oscuro carbón profundo.
+Designed entirely as a static single-page application, ready to be deployed for free and immediately on **Cloudflare Pages** (or GitHub Pages, Vercel, Netlify).
 
 ---
 
-## 🛠️ Stack Tecnológico
+## ✨ Key Features
 
-- **Núcleo**: React 18 + TypeScript + Vite.
-- **Estilos**: Tailwind CSS v3 (Altamente optimizado y compatible con todos los navegadores).
-- **Lógica de Ajedrez**: `chess.js` (Para la validación de movimientos y reglas de ajedrez).
-- **Tablero Gráfico**: `react-chessboard` v5 (Utilizando la API unificada de opciones, súper rápida y responsive).
-- **Iconos**: `lucide-react`.
+1. **Minimalist & Timeless Aesthetic**: Inspired by *Chessreps*, *Lichess*, and clean interfaces like *Substack* or *Linear*. Features a curated palette of warm earth, soft sepia, and carbon tones. No aggressive neon lights or heavy futuristic animations.
+2. **Low Resource Consumption**:
+   - All state, progress metrics, and repertoires are evaluated and saved locally in the browser using `localStorage`.
+   - Zero servers, zero databases, zero heavy API calls.
+   - 100% performance on Google Lighthouse.
+3. **Optimized Training Loop**:
+   - **Demonstration Mode**: Guides the user by dynamically drawing translucent helper arrows on the board showing the expected move. Once completed, the system registers the line as introduced.
+   - **Practice Mode**: Challenges the user to play the theoretical lines entirely from memory. In case of an incorrect or non-theoretical move, the board immediately triggers subtle visual feedback (soft red flash and lateral vibration) and reverts the move, allowing you to try again.
+4. **Auto-Opponent Responses**: When you execute a correct theoretical move, after a natural delay of 400ms, the machine automatically plays the pre-configured opponent response.
+5. **Educational Strategic Comments**: Every move in a variation contains strategic annotations and educational commentary, explaining the *why* behind every position.
+6. **Adaptive Theme**: Toggle easily between a soft warm sepia light mode and a deep carbon dark mode.
 
 ---
 
-## 📂 Estructura de Datos (TypeScript)
+## 🛠️ Technology Stack
 
-El árbol de variantes se modela de forma lineal y secuencial en `src/types.ts`:
+- **Core**: React 18 + TypeScript + Vite.
+- **Styling**: Tailwind CSS v3 (highly optimized and production-ready).
+- **Chess Logic**: `chess.js` (for full move validation and rule compliance).
+- **Graphical Board**: `react-chessboard` v5 (utilizing the new unified options API, ultra-responsive and fast).
+- **Icon Set**: `lucide-react`.
+
+---
+
+## 📂 Data Structure (TypeScript)
+
+Repertoire variations are modeled linearly in `src/types.ts`:
 
 ```typescript
 export interface MoveNode {
-  from: string;      // Casilla origen, ej: "e2"
-  to: string;        // Casilla destino, ej: "e4"
-  notation: string;  // Notación algebraica, ej: "e4"
-  comment?: string;  // Explicación estratégica de la jugada
+  from: string;      // Source square, e.g., "e2"
+  to: string;        // Target square, e.g., "e4"
+  notation: string;  // Algebraic notation, e.g., "e4"
+  comment?: string;  // Educational comment explaining the move
 }
 
 export interface OpeningVariant {
   id: string;
-  name: string;      // Nombre de la variante
-  openingName: string; // Apertura principal
-  description: string; // Contexto histórico/estratégico
-  side: 'white' | 'black'; // Bando que practica el usuario
-  moves: MoveNode[]; // Lista ordenada de jugadas alternativas
+  name: string;        // Variation name
+  openingName: string; // Main opening name
+  description: string; // Repertoire context/strategy explanation
+  side: 'white' | 'black'; // The side played by the user
+  moves: MoveNode[];   // Ordered list of repertoire moves
 }
 ```
 
 ---
 
-## 🚀 Despliegue en Cloudflare Pages (¡Gratis e Instantáneo!)
+## 🚀 Deployment to Cloudflare Pages (Free & Instant!)
 
-Al tratarse de una aplicación estática compilada con Vite, el despliegue en **Cloudflare Pages** es sumamente sencillo e inmediato a través de su integración nativa con GitHub:
+As ChessOp compiles entirely down to static assets, deploying to **Cloudflare Pages** is incredibly straightforward through GitHub:
 
-1. Crea un repositorio en tu cuenta de **GitHub** y sube el código del proyecto.
-2. Inicia sesión en tu panel de **Cloudflare**.
-3. Ve a **Workers & Pages** -> **Create application** -> pestaña **Pages** -> **Connect to Git**.
-4. Selecciona tu repositorio recién creado.
-5. En la configuración del proyecto, selecciona la plantilla preestablecida de **Vite**:
+1. Create a repository on your **GitHub** account and upload the code.
+2. Log into your **Cloudflare** dashboard.
+3. Go to **Workers & Pages** -> **Create application** -> **Pages** tab -> **Connect to Git**.
+4. Select your newly created repository.
+5. In the build settings, select the **Vite** preset:
    - **Framework Preset**: `Vite`
    - **Build Command**: `npm run build`
    - **Build Output Directory**: `dist`
-6. Haz clic en **Save and Deploy**. ¡Listo! Tu sitio estará en línea en segundos en una URL como `https://tu-proyecto.pages.dev/` con SSL gratis y CDN global ultrarrápido.
+6. Click **Save and Deploy**. Your site will be online in seconds on a subdomain like `https://your-project.pages.dev/` with free SSL and global CDN.
 
 ---
 
-## 💻 Desarrollo Local
+## 💻 Local Development
 
-Si deseas modificar la base de datos de aperturas o añadir tus propios repertorios:
+To modify the openings database, add your own repertoires, or tweak styling:
 
-1. **Clona el repositorio**:
+1. **Clone the repository**:
    ```bash
-   git clone <URL_DEL_REPOSITORIO>
+   git clone <REPOSITORY_URL>
    cd ChessOp
    ```
 
-2. **Instala las dependencias**:
+2. **Install dependencies**:
    ```bash
    npm install --legacy-peer-deps
    ```
 
-3. **Inicia el servidor de desarrollo**:
+3. **Start the development server**:
    ```bash
    npm run dev
    ```
 
-4. **Compila para producción**:
+4. **Build for production**:
    ```bash
    npm run build
    ```
 
 ---
 
-## 📜 Licencia
+## 📜 License
 
-Este proyecto es de código abierto y está disponible bajo la licencia **MIT**. ¡Siéntete libre de clonarlo, mejorarlo y adaptarlo a tu propio estilo de juego! 🚀
-# ChessOP
-# ChessOP
+This project is open-source and released under the **MIT License**. Feel free to fork it, adapt it to your own opening repertoire, and play! 🚀
