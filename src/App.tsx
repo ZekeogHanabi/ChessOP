@@ -218,6 +218,7 @@ function App() {
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [lastMoveComment, setLastMoveComment] = useState<string | null>(null);
+  const [completedVariantsThisSession, setCompletedVariantsThisSession] = useState<string[]>([]);
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -263,6 +264,11 @@ function App() {
     // Initialize a fresh clean chess.js instance
     const chessInstance = new Chess();
     game.current = chessInstance;
+
+    // Reset session completions if starting a different chapter
+    if (!currentVariant || currentVariant.chapterName !== variant.chapterName) {
+      setCompletedVariantsThisSession([]);
+    }
     
     // Determine whether we should start in Demo Mode
     const progress = userProgress[variant.id];
@@ -332,10 +338,37 @@ function App() {
 
     if (!isUserTurn) return false;
 
+    let actualVariant = currentVariant;
+    let actualExpectedMove = expectedMove;
+
     // Check if source and target squares match the expected move
     if (sourceSquare !== expectedMove.from || targetSquare !== expectedMove.to) {
-      triggerErrorFeedback();
-      return false;
+      // Look for alternative variation in the same chapter that matches the played path + this move
+      const alternativeVariant = variants.find(v => {
+        if (v.chapterName !== currentVariant.chapterName || v.id === currentVariant.id) return false;
+        if (v.moves.length <= currentIndex) return false;
+        
+        // Match history
+        for (let i = 0; i < currentIndex; i++) {
+          if (v.moves[i].from !== currentVariant.moves[i].from || v.moves[i].to !== currentVariant.moves[i].to) {
+            return false;
+          }
+        }
+        
+        // Match new move
+        return v.moves[currentIndex].from === sourceSquare && v.moves[currentIndex].to === targetSquare;
+      });
+
+      if (alternativeVariant) {
+        // Yes! Switch to the alternative variation dynamically
+        actualVariant = alternativeVariant;
+        actualExpectedMove = alternativeVariant.moves[currentIndex];
+        setCurrentVariant(alternativeVariant);
+        setFeedbackMessage(`Switched to: ${alternativeVariant.name}`);
+      } else {
+        triggerErrorFeedback();
+        return false;
+      }
     }
 
     try {
@@ -356,17 +389,17 @@ function App() {
       setCurrentIndex(nextIndex);
       setGameFen(game.current.fen());
       setFeedbackMessage('Correct!');
-      if (expectedMove.comment) {
-        setLastMoveComment(expectedMove.comment);
+      if (actualExpectedMove.comment) {
+        setLastMoveComment(actualExpectedMove.comment);
       }
 
       // Check if the line has been completed
-      if (nextIndex >= currentVariant.moves.length) {
-        completeTraining(currentVariant, true);
+      if (nextIndex >= actualVariant.moves.length) {
+        completeTraining(actualVariant, true);
       } else {
         // Trigger automatic opponent response after 400ms
         setTimeout(() => {
-          makeRivalMove(nextIndex, currentVariant, game.current);
+          makeRivalMove(nextIndex, actualVariant, game.current);
         }, 400);
       }
 
@@ -389,9 +422,6 @@ function App() {
 
   // --- Handle Successful Training Run ---
   const completeTraining = (variant: OpeningVariant, success: boolean) => {
-    setIsCompleted(true);
-    setFeedbackMessage('Variation completed successfully!');
-    
     // Save progress stats to localStorage
     const currentProg = userProgress[variant.id] || {
       variantId: variant.id,
@@ -420,6 +450,35 @@ function App() {
 
     setUserProgress(updatedProgress);
     localStorage.setItem('chessop_progress', JSON.stringify(updatedProgress));
+
+    // Handle transition / victory state
+    if (variant.chapterName) {
+      const chapter = chapters.find(ch => ch.title === variant.chapterName);
+      if (chapter && chapter.variants.length > 1) {
+        // Track session completion
+        const nextCompleted = [...completedVariantsThisSession, variant.id];
+        setCompletedVariantsThisSession(nextCompleted);
+
+        // Check if all variants in the chapter are completed
+        const allCompleted = chapter.variants.every(v => nextCompleted.includes(v.id));
+
+        if (!allCompleted) {
+          // Find the next uncompleted variant
+          const nextUncompleted = chapter.variants.find(v => !nextCompleted.includes(v.id));
+          if (nextUncompleted) {
+            setFeedbackMessage(`Line completed! Auto-loading next variation: ${nextUncompleted.name}...`);
+            setTimeout(() => {
+              startVariant(nextUncompleted, isDemoMode);
+            }, 1800);
+            return;
+          }
+        }
+      }
+    }
+
+    // Default: Show the final victory completion screen for the chapter
+    setIsCompleted(true);
+    setFeedbackMessage('Chapter completed successfully!');
   };
 
   // --- Return to Menu ---
@@ -450,8 +509,29 @@ function App() {
   const totalSuccesses = Object.values(userProgress).reduce((acc, curr) => acc + curr.successes, 0);
   const masteredOpenings = Object.values(userProgress).filter(p => p.successes > 0).length;
 
-  // Group Vienna Variations for filtering stats
-  const viennaVariants = variants.filter(v => v.openingName === 'Vienna Repertoire');
+  // Group Vienna Variations and filter to only keep highly useful theoretical lines
+  const viennaVariants = useMemo(() => {
+    const VIENNA_UTILITY_ORDER = [
+      "Vienna Gambit: Accepted",
+      "Vienna Gambit: Main Line",
+      "Vienna Gambit: Declined 3... Nf6",
+      "Vienna Gambit: Declined 3... d6",
+      "Vienna Hybrid: Main Line",
+      "Vienna Copycat: Main Line",
+      "Vienna Mieses: Main Line",
+      "Hamppe-Meitner Variation",
+      "Jeanisch Gambit: Accepted",
+      "Vienna Gambit: Paulsen Attack",
+      "Vienna Open Variation"
+    ];
+
+    const isViennaUseful = (title?: string): boolean => {
+      if (!title) return false;
+      return VIENNA_UTILITY_ORDER.some(key => title.toLowerCase().includes(key.toLowerCase()));
+    };
+
+    return variants.filter(v => v.openingName === 'Vienna Repertoire' && isViennaUseful(v.chapterName));
+  }, [variants]);
   
   // Stats specifically for Vienna Repertoire
   const viennaAttempts = viennaVariants.reduce((acc, curr) => acc + (userProgress[curr.id]?.attempts || 0), 0);
@@ -526,7 +606,27 @@ function App() {
   }, [chapters]);
 
   const viennaChapters = useMemo(() => {
-    return chapters.filter(ch => ch.category === 'Vienna Repertoire');
+    const VIENNA_UTILITY_ORDER = [
+      "Vienna Gambit: Accepted",
+      "Vienna Gambit: Main Line",
+      "Vienna Gambit: Declined 3... Nf6",
+      "Vienna Gambit: Declined 3... d6",
+      "Vienna Hybrid: Main Line",
+      "Vienna Copycat: Main Line",
+      "Vienna Mieses: Main Line",
+      "Hamppe-Meitner Variation",
+      "Jeanisch Gambit: Accepted",
+      "Vienna Gambit: Paulsen Attack",
+      "Vienna Open Variation"
+    ];
+
+    const getViennaUtilityScore = (title: string): number => {
+      const idx = VIENNA_UTILITY_ORDER.findIndex(key => title.toLowerCase().includes(key.toLowerCase()));
+      return idx === -1 ? 99 : idx;
+    };
+
+    const list = chapters.filter(ch => ch.category === 'Vienna Repertoire');
+    return [...list].sort((a, b) => getViennaUtilityScore(a.title) - getViennaUtilityScore(b.title));
   }, [chapters]);
 
   // Filter Vienna chapters based on search query in the Vienna Directory
