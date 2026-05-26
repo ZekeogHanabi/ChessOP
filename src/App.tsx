@@ -227,6 +227,7 @@ function App() {
   const [showHintArrow, setShowHintArrow] = useState<boolean>(false);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
+  const [maxReachedIndex, setMaxReachedIndex] = useState<number>(0);
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -292,6 +293,7 @@ function App() {
     setShowHintArrow(false);
     setSelectedSquare(null);
     setOptionSquares({});
+    setMaxReachedIndex(0);
     setFeedbackMessage(
       shouldStartDemo
         ? 'Demonstration Mode: Follow the arrow to learn the opening line.'
@@ -321,6 +323,7 @@ function App() {
 
       const nextIndex = index + 1;
       setCurrentIndex(nextIndex);
+      setMaxReachedIndex(prev => Math.max(prev, nextIndex));
       setGameFen(chessInstance.fen());
       setConsecutiveMistakes(0);
       
@@ -400,6 +403,7 @@ function App() {
       // Correct move: Update states
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
+      setMaxReachedIndex(prev => Math.max(prev, nextIndex));
       setGameFen(game.current.fen());
       setFeedbackMessage('Correct!');
       setConsecutiveMistakes(0);
@@ -482,6 +486,73 @@ function App() {
     } else {
       setSelectedSquare(null);
       setOptionSquares({});
+    }
+  };
+
+  // --- Move Navigation Handlers (Undo / Redo) ---
+  const handleNavigateBackward = () => {
+    if (!currentVariant || currentIndex <= 0 || boardError) return;
+
+    const newIndex = currentIndex - 1;
+    
+    // Reconstruct the game state up to newIndex
+    const tempChess = new Chess();
+    for (let i = 0; i < newIndex; i++) {
+      try {
+        tempChess.move({
+          from: currentVariant.moves[i].from,
+          to: currentVariant.moves[i].to,
+          promotion: 'q'
+        });
+      } catch (err) {
+        console.error('Error rebuilding FEN during backward navigation:', err);
+      }
+    }
+    game.current = tempChess;
+    setGameFen(tempChess.fen());
+    setCurrentIndex(newIndex);
+    
+    // Clear selection highlights
+    setSelectedSquare(null);
+    setOptionSquares({});
+    
+    // Update commentator text
+    if (newIndex === 0) {
+      setLastMoveComment(currentVariant.description);
+    } else {
+      const lastMove = currentVariant.moves[newIndex - 1];
+      if (lastMove.comment) {
+        setLastMoveComment(lastMove.comment);
+      }
+    }
+  };
+
+  const handleNavigateForward = () => {
+    if (!currentVariant || currentIndex >= maxReachedIndex || boardError) return;
+
+    const nextMove = currentVariant.moves[currentIndex];
+    if (!nextMove) return;
+
+    try {
+      game.current.move({
+        from: nextMove.from,
+        to: nextMove.to,
+        promotion: 'q'
+      });
+      
+      const newIndex = currentIndex + 1;
+      setGameFen(game.current.fen());
+      setCurrentIndex(newIndex);
+      
+      // Clear selection highlights
+      setSelectedSquare(null);
+      setOptionSquares({});
+      
+      if (nextMove.comment) {
+        setLastMoveComment(nextMove.comment);
+      }
+    } catch (err) {
+      console.error('Error executing forward navigation move:', err);
     }
   };
 
@@ -595,6 +666,7 @@ function App() {
     setPlaylistMode('none');
     setSelectedSquare(null);
     setOptionSquares({});
+    setMaxReachedIndex(0);
   };
 
   // --- Trigger Move Hint ---
@@ -1032,7 +1104,7 @@ function App() {
         
         {currentVariant ? (
           /* ================= 1. TRAINING VIEW ================= */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-6xl mx-auto w-full animate-fadeIn">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-7xl mx-auto w-full animate-fadeIn">
             
             {/* SIDE CONTROL PANEL */}
             <div className="lg:col-span-4 space-y-6 order-2 lg:order-1 flex flex-col justify-center h-full">
@@ -1142,7 +1214,7 @@ function App() {
             <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
               
               {/* Minimalist Feedback Banner */}
-              <div className="w-full max-w-[620px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
+              <div className="w-full max-w-[775px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
                 {feedbackMessage && (
                   <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
                     boardError
@@ -1171,7 +1243,7 @@ function App() {
               </div>
 
               {/* Dynamic Progress Bar */}
-              <div className="w-full max-w-[620px] mb-4 space-y-1.5 animate-fadeIn">
+              <div className="w-full max-w-[775px] mb-4 space-y-1.5 animate-fadeIn">
                 <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 dark:text-neutral-450 px-1 tracking-wider">
                   <span>VARIATION PROGRESS</span>
                   <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
@@ -1186,7 +1258,7 @@ function App() {
 
               {/* Chessboard container with Error/Success borders */}
               <div
-                className={`w-full max-w-[620px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
+                className={`w-full max-w-[775px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
                   boardError 
                     ? 'border-red-500/80 scale-[0.99] shake-animation' 
                     : isCompleted 
@@ -1213,9 +1285,44 @@ function App() {
                 />
               </div>
 
+              {/* Chessboard Navigation Controls (Backward, Counter, Forward) */}
+              <div className="w-full max-w-[775px] mt-4 flex items-center justify-between bg-white/50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 shadow-sm">
+                <button
+                  onClick={handleNavigateBackward}
+                  disabled={currentIndex <= 0}
+                  className={`flex items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-all active:scale-95 shadow-sm ${
+                    currentIndex <= 0
+                      ? 'opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-neutral-900 text-neutral-400'
+                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-brand-dark dark:text-brand-secondary font-bold'
+                  }`}
+                  title="Step Backward (Undo Move)"
+                  aria-label="Step Backward"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+
+                <div className="text-xs font-black tracking-wider text-neutral-500 uppercase select-none">
+                  PLY {currentIndex} / {currentVariant.moves.length}
+                </div>
+
+                <button
+                  onClick={handleNavigateForward}
+                  disabled={currentIndex >= maxReachedIndex}
+                  className={`flex items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-all active:scale-95 shadow-sm ${
+                    currentIndex >= maxReachedIndex
+                      ? 'opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-neutral-900 text-neutral-400'
+                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-brand-dark dark:text-brand-secondary font-bold'
+                  }`}
+                  title="Step Forward (Redo Move)"
+                  aria-label="Step Forward"
+                >
+                  <ArrowLeft size={16} className="rotate-180" />
+                </button>
+              </div>
+
               {/* Victory Overlay Panel */}
               {isCompleted && (
-                <div className="w-full max-w-[620px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
+                <div className="w-full max-w-[775px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
                   <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
                     <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
                     Excellent! You memorized the variation
@@ -1429,6 +1536,46 @@ function App() {
 
             {/* Version List */}
             <div className="space-y-8">
+              {/* Version 1.0.1 */}
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+                  <div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                      v1.0.1 • Navigation & Board Scale
+                    </span>
+                    <h3 className="text-2xl font-black mt-2 tracking-tight">Sizing & History Navigation</h3>
+                  </div>
+                  <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+                    Released: May 26, 2026
+                  </span>
+                </div>
+
+                <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+                  <p>
+                    This minor release brings significant usability and visual enhancements to help you review lines with maximum ease and visual comfort!
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">↩️ Move History Navigation (Undo & Redo)</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li><strong>Stepping Navigation Arrows</strong>: Effortlessly step backward or forward through the move sequence at any time using the new control buttons right under the chessboard.</li>
+                      <li><strong>History Redo Memory</strong>: Going forward is beautifully restricted to only the plies you have successfully played or seen, ensuring a robust, spoiler-free training flow.</li>
+                      <li><strong>Live Ply Counter</strong>: Renders a tracking badge in the navigation row (e.g., <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">PLY 3 / 10</code>) for precise progress mapping.</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🔍 Expanded 775px Chessboard</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li><strong>25% Board Scale-up</strong>: Enlarged the primary Chessboard and all sibling containers (feedback banner, progress bar, victory overlay) from <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">620px</code> to <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">775px</code>.</li>
+                      <li><strong>Luxurious Spacious Grid</strong>: Upgraded the central training view wrapper to a massive <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">max-w-7xl</code> container to offer high-fidelity spacing and premium margins.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
               {/* Version 1.0.0 */}
               <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
@@ -1605,7 +1752,7 @@ function App() {
       <div className="fixed bottom-4 right-4 z-50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 shadow-lg flex items-center gap-2 text-[10px] md:text-xs font-bold text-neutral-500 dark:text-neutral-400 select-none transition-all duration-300 hover:scale-105 hover:border-brand-primary/45">
         <span className="flex items-center gap-1">
           <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          v1.0.0
+          v1.0.1
         </span>
         <span className="text-neutral-300 dark:text-neutral-700">|</span>
         <button
