@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
+import { Chessboard, ChessboardProvider } from 'react-chessboard';
 import {
   BookOpen,
   Award,
@@ -564,7 +564,9 @@ function App() {
                     : 'border-white dark:border-neutral-850'
                 }`}
               >
-                <Chessboard options={getBoardOptions()} />
+                <ChessboardProvider options={getBoardOptions()}>
+                  <Chessboard />
+                </ChessboardProvider>
               </div>
 
               {/* Victory Overlay Panel */}
