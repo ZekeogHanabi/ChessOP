@@ -223,6 +223,8 @@ function App() {
   const [playlistQueue, setPlaylistQueue] = useState<OpeningVariant[]>([]);
   const [playlistOriginalSize, setPlaylistOriginalSize] = useState<number>(0);
   const [playlistIndex, setPlaylistIndex] = useState<number>(0);
+  const [consecutiveMistakes, setConsecutiveMistakes] = useState<number>(0);
+  const [showHintArrow, setShowHintArrow] = useState<boolean>(false);
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -284,6 +286,8 @@ function App() {
     setIsDemoMode(shouldStartDemo);
     setIsCompleted(false);
     setBoardError(false);
+    setConsecutiveMistakes(0);
+    setShowHintArrow(false);
     setFeedbackMessage(
       shouldStartDemo
         ? 'Demonstration Mode: Follow the arrow to learn the opening line.'
@@ -314,6 +318,7 @@ function App() {
       const nextIndex = index + 1;
       setCurrentIndex(nextIndex);
       setGameFen(chessInstance.fen());
+      setConsecutiveMistakes(0);
       
       if (rivalMove.comment) {
         setLastMoveComment(rivalMove.comment);
@@ -393,6 +398,7 @@ function App() {
       setCurrentIndex(nextIndex);
       setGameFen(game.current.fen());
       setFeedbackMessage('Correct!');
+      setConsecutiveMistakes(0);
       if (actualExpectedMove.comment) {
         setLastMoveComment(actualExpectedMove.comment);
       }
@@ -418,6 +424,7 @@ function App() {
   const triggerErrorFeedback = () => {
     setBoardError(true);
     setFeedbackMessage('Incorrect move. Try again!');
+    setConsecutiveMistakes(prev => prev + 1);
     
     setTimeout(() => {
       setBoardError(false);
@@ -519,9 +526,27 @@ function App() {
     setPlaylistMode('none');
   };
 
+  // --- Trigger Move Hint ---
+  const triggerHint = () => {
+    if (!currentVariant || isCompleted) return;
+    const expectedMove = currentVariant.moves[currentIndex];
+    if (!expectedMove) return;
+
+    setShowHintArrow(true);
+    setFeedbackMessage(`Hint: The next move is ${expectedMove.notation}!`);
+    
+    // Clear hint arrow after 2.5 seconds
+    setTimeout(() => {
+      setShowHintArrow(false);
+    }, 2500);
+  };
+
   // --- Get Demonstration Guide Arrow (react-chessboard v4 double array shape) ---
   const getDemoArrows = (): string[][] | undefined => {
-    if (!isDemoMode || !currentVariant || isCompleted) return undefined;
+    if (!currentVariant || isCompleted) return undefined;
+    
+    // Draw arrow in Demo Mode or when Hint is active
+    if (!isDemoMode && !showHintArrow) return undefined;
 
     const expectedMove = currentVariant.moves[currentIndex];
     const isUserTurn = currentVariant.side === 'white'
@@ -1046,7 +1071,7 @@ function App() {
             <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
               
               {/* Minimalist Feedback Banner */}
-              <div className="w-full max-w-[480px] mb-3 text-center transition-all duration-300 min-h-[28px] flex items-center justify-center">
+              <div className="w-full max-w-[480px] mb-3 text-center transition-all duration-300 min-h-[32px] flex items-center justify-center gap-3">
                 {feedbackMessage && (
                   <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
                     boardError
@@ -1059,6 +1084,17 @@ function App() {
                     {isCompleted && <CheckCircle2 size={12} className="mr-1" />}
                     {feedbackMessage}
                   </span>
+                )}
+
+                {/* Dynamic Hint Action Button */}
+                {!isDemoMode && !isCompleted && consecutiveMistakes >= 3 && (
+                  <button
+                    onClick={triggerHint}
+                    className="px-3 py-1 rounded-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-extrabold text-[10px] uppercase tracking-wider transition-all cursor-pointer animate-bounce border border-brand-primary/20 shadow-sm flex items-center gap-1 active:scale-95"
+                    title="Reveal expected move hint"
+                  >
+                    <span>💡 Get Hint</span>
+                  </button>
                 )}
               </div>
 
