@@ -225,6 +225,8 @@ function App() {
   const [playlistIndex, setPlaylistIndex] = useState<number>(0);
   const [consecutiveMistakes, setConsecutiveMistakes] = useState<number>(0);
   const [showHintArrow, setShowHintArrow] = useState<boolean>(false);
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -288,6 +290,8 @@ function App() {
     setBoardError(false);
     setConsecutiveMistakes(0);
     setShowHintArrow(false);
+    setSelectedSquare(null);
+    setOptionSquares({});
     setFeedbackMessage(
       shouldStartDemo
         ? 'Demonstration Mode: Follow the arrow to learn the opening line.'
@@ -403,6 +407,10 @@ function App() {
         setLastMoveComment(actualExpectedMove.comment);
       }
 
+      // Reset selection and options highlights on move completion
+      setSelectedSquare(null);
+      setOptionSquares({});
+
       // Check if the line has been completed
       if (nextIndex >= actualVariant.moves.length) {
         completeTraining(actualVariant, true);
@@ -420,11 +428,72 @@ function App() {
     }
   };
 
+  // --- Click to Move and Highlights Handler ---
+  const handleSquareClick = (square: string) => {
+    if (!currentVariant || isCompleted || boardError) return;
+
+    // Validate if it is the user's turn to move based on their selected side
+    const isUserTurn = currentVariant.side === 'white'
+      ? currentIndex % 2 === 0
+      : currentIndex % 2 === 1;
+
+    if (!isUserTurn) return;
+
+    if (selectedSquare) {
+      // If we click on the same square, deselect it
+      if (selectedSquare === square) {
+        setSelectedSquare(null);
+        setOptionSquares({});
+        return;
+      }
+
+      // Try to execute the move!
+      const success = handlePieceDrop(selectedSquare, square);
+      if (success) {
+        // Move made successfully! Clear selection
+        setSelectedSquare(null);
+        setOptionSquares({});
+        return;
+      }
+    }
+
+    // If move was not made, let's see if we clicked a piece of our color to select it
+    const piece = game.current.get(square as any);
+    const expectedColor = currentVariant.side === 'white' ? 'w' : 'b';
+
+    if (piece && piece.color === expectedColor) {
+      setSelectedSquare(square);
+
+      // Get possible moves for highlight
+      const rawMoves = game.current.moves({ square: square as any, verbose: true }) as any[];
+      const highlightSquares: Record<string, React.CSSProperties> = {};
+      
+      rawMoves.forEach((m) => {
+        const targetPiece = game.current.get(m.to);
+        highlightSquares[m.to] = {
+          background: targetPiece
+            ? 'radial-gradient(circle, transparent 50%, rgba(140, 106, 92, 0.45) 56%)'
+            : 'radial-gradient(circle, rgba(140, 106, 92, 0.4) 20%, transparent 25%)',
+          borderRadius: '50%'
+        };
+      });
+
+      setOptionSquares(highlightSquares);
+    } else {
+      setSelectedSquare(null);
+      setOptionSquares({});
+    }
+  };
+
   // --- Visual Error Feedback ---
   const triggerErrorFeedback = () => {
     setBoardError(true);
     setFeedbackMessage('Incorrect move. Try again!');
     setConsecutiveMistakes(prev => prev + 1);
+    
+    // Clear selection highlights on mistake to keep the UI clean
+    setSelectedSquare(null);
+    setOptionSquares({});
     
     setTimeout(() => {
       setBoardError(false);
@@ -524,6 +593,8 @@ function App() {
     setLastMoveComment(null);
     setFeedbackMessage(null);
     setPlaylistMode('none');
+    setSelectedSquare(null);
+    setOptionSquares({});
   };
 
   // --- Trigger Move Hint ---
@@ -961,7 +1032,7 @@ function App() {
         
         {currentVariant ? (
           /* ================= 1. TRAINING VIEW ================= */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-5xl mx-auto w-full animate-fadeIn">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-6xl mx-auto w-full animate-fadeIn">
             
             {/* SIDE CONTROL PANEL */}
             <div className="lg:col-span-4 space-y-6 order-2 lg:order-1 flex flex-col justify-center h-full">
@@ -1071,7 +1142,7 @@ function App() {
             <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
               
               {/* Minimalist Feedback Banner */}
-              <div className="w-full max-w-[560px] mb-3 text-center transition-all duration-300 min-h-[32px] flex items-center justify-center gap-3">
+              <div className="w-full max-w-[620px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
                 {feedbackMessage && (
                   <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
                     boardError
@@ -1090,16 +1161,17 @@ function App() {
                 {!isDemoMode && !isCompleted && consecutiveMistakes >= 3 && (
                   <button
                     onClick={triggerHint}
-                    className="px-3 py-1 rounded-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-extrabold text-[10px] uppercase tracking-wider transition-all cursor-pointer animate-bounce border border-brand-primary/20 shadow-sm flex items-center gap-1 active:scale-95"
+                    className="px-5 py-2.5 rounded-xl bg-brand-primary/15 hover:bg-brand-primary/25 text-brand-primary font-black text-xs md:text-sm uppercase tracking-widest transition-all cursor-pointer animate-bounce border-2 border-brand-primary/45 shadow-md flex items-center gap-2 active:scale-95 duration-200"
                     title="Reveal expected move hint"
                   >
-                    <span>💡 Get Hint</span>
+                    <span className="text-sm md:text-base">💡</span>
+                    <span>Get Hint</span>
                   </button>
                 )}
               </div>
 
               {/* Dynamic Progress Bar */}
-              <div className="w-full max-w-[560px] mb-4 space-y-1.5 animate-fadeIn">
+              <div className="w-full max-w-[620px] mb-4 space-y-1.5 animate-fadeIn">
                 <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 dark:text-neutral-450 px-1 tracking-wider">
                   <span>VARIATION PROGRESS</span>
                   <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
@@ -1114,7 +1186,7 @@ function App() {
 
               {/* Chessboard container with Error/Success borders */}
               <div
-                className={`w-full max-w-[560px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
+                className={`w-full max-w-[620px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
                   boardError 
                     ? 'border-red-500/80 scale-[0.99] shake-animation' 
                     : isCompleted 
@@ -1125,6 +1197,13 @@ function App() {
                 <Chessboard
                   position={gameFen}
                   onPieceDrop={handlePieceDrop}
+                  onSquareClick={handleSquareClick}
+                  customSquareStyles={{
+                    ...optionSquares,
+                    ...(selectedSquare && {
+                      [selectedSquare]: { backgroundColor: 'rgba(140, 106, 92, 0.35)' }
+                    })
+                  }}
                   boardOrientation={currentVariant.side}
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   customArrows={getDemoArrows() as any}
@@ -1136,7 +1215,7 @@ function App() {
 
               {/* Victory Overlay Panel */}
               {isCompleted && (
-                <div className="w-full max-w-[560px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
+                <div className="w-full max-w-[620px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
                   <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
                     <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
                     Excellent! You memorized the variation
