@@ -190,7 +190,7 @@ const convertPgnToVariants = (chapterIndex: number, game: ParsedPgnGame): Openin
 function App() {
   // --- Available Variants State ---
   const [variants, setVariants] = useState<OpeningVariant[]>(OPENING_VARIANTS);
-  const [activeView, setActiveView] = useState<'menu' | 'vienna-directory'>('menu');
+  const [activeView, setActiveView] = useState<'menu' | 'vienna-directory' | 'changelog'>('menu');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedChapters, setExpandedChapters] = useState<{ [key: string]: boolean }>({});
 
@@ -1408,6 +1408,81 @@ function App() {
               </div>
             </div>
           </div>
+        ) : activeView === 'changelog' ? (
+          /* ================= 4. SYSTEM CHANGELOG VIEW ================= */
+          <div className="max-w-3xl mx-auto w-full space-y-8 animate-fadeIn">
+            {/* Navigation and Title */}
+            <div>
+              <button
+                onClick={() => { setActiveView('menu'); }}
+                className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer mb-3"
+              >
+                <ArrowLeft size={14} className="mr-1" />
+                Back to Main Menu
+              </button>
+              
+              <h2 className="text-3xl font-extrabold tracking-tight">System Changelog</h2>
+              <p className="text-neutral-500 dark:text-neutral-450 text-sm mt-1">
+                Keep track of updates, optimizations, and new features implemented in ChessOp.
+              </p>
+            </div>
+
+            {/* Version List */}
+            <div className="space-y-8">
+              {/* Version 1.0.0 */}
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+                  <div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                      v1.0.0 • Initial Release
+                    </span>
+                    <h3 className="text-2xl font-black mt-2 tracking-tight">The Opening Repertoire Foundation</h3>
+                  </div>
+                  <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+                    Released: May 26, 2026
+                  </span>
+                </div>
+
+                <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+                  <p>
+                    Welcome to the first official release of <strong>ChessOp (v1.0.0)</strong>! This system has been designed from the ground up as a high-fidelity opening repertoire memorizer centered around active recall, custom PGN study parsing, and fluid training algorithms.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">✨ Primary Core Systems</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li><strong>Dynamic Lichess Study PGN Parser</strong>: Processes comprehensive recursive chapter files (RAVs) in real time from <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[11px] font-mono">public/vienna.pgn</code>, converting PGN moves directly into executable training blocks.</li>
+                      <li><strong>Interactive Practice & Demo Loops</strong>: Switch between guided Demo Mode (with visual guiding arrows) and memory-based Practice Mode (validating your moves live on the board).</li>
+                      <li><strong>Dual Input Action Modes</strong>: Play moves concurrently by either drag-and-dropping pieces or using tap-to-move (click piece, click destination).</li>
+                      <li><strong>Dynamic Legal Move Spotlights</strong>: Visualise valid destinations with sepia target dots and capture ring overlays when pieces are pressed.</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">📖 Repertoire Playlist Challenges</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li><strong>Vienna Repertoire Directory</strong>: A clean, sorted chapter catalog dynamically organizing the Vienna Opening in popularity order.</li>
+                      <li><strong>Rumble Challenge Playlist</strong>: Shuffles the main line of the 11 principal popular chapters to test your overall repertoire retention under pressure.</li>
+                      <li><strong>Study Main Lines Playlist</strong>: Practice all 11 popular main lines in order, transitioning automatically from one chapter to the next.</li>
+                      <li><strong>Live Training HUD</strong>: Shows a dynamic progress badge tracking your active playlist tracks.</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">💡 Active Recall & UI Polish</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li><strong>Bouncing Get Hint Trigger</strong>: Appears automatically after 3 consecutive mistakes. Clicking it reveals coordinate messages and draws guiding arrows on the board.</li>
+                      <li><strong>Adaptive Practice Branching</strong>: Switches active variation branches on the fly if a sideline of the same chapter is played.</li>
+                      <li><strong>Collapsible Sidelines Drawer</strong>: Sidelines beyond the top 11 chapters are elegantly hidden in a collapsible grid drawer labeled "Not so popular variations".</li>
+                      <li><strong>Curated Earth-Sepia Aesthetic</strong>: High-end layout with warm sepia elements, dark/light theme syncing, responsive Chessboard scaling to <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[11px] font-mono">620px</code>, and custom victory overlays.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           /* ================= 3. DEDICATED VIENNA DIRECTORY EXPLORER VIEW ================= */
           <div className="space-y-6 animate-fadeIn">
@@ -1525,6 +1600,26 @@ function App() {
           Designed for 100% local storage and ultra-low resource consumption.
         </p>
       </footer>
+
+      {/* Floating Version & Changelog Widget */}
+      <div className="fixed bottom-4 right-4 z-50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 shadow-lg flex items-center gap-2 text-[10px] md:text-xs font-bold text-neutral-500 dark:text-neutral-400 select-none transition-all duration-300 hover:scale-105 hover:border-brand-primary/45">
+        <span className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+          v1.0.0
+        </span>
+        <span className="text-neutral-300 dark:text-neutral-700">|</span>
+        <button
+          onClick={() => {
+            setCurrentVariant(null);
+            setIsCompleted(false);
+            setPlaylistMode('none');
+            setActiveView('changelog');
+          }}
+          className="text-brand-primary hover:text-brand-primary/80 transition-colors cursor-pointer font-extrabold underline decoration-brand-primary/30 underline-offset-2 font-black"
+        >
+          Changelog
+        </button>
+      </div>
     </div>
   );
 }
