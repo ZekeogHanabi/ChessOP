@@ -701,17 +701,16 @@ function App() {
   const startRumbleChallenge = () => {
     if (popularViennaChapters.length === 0) return;
 
-    // For each chapter, pick a random variation from its variants
-    const chosenVariations: OpeningVariant[] = [];
+    // Collect the Main Line (variants[0]) of each popular chapter
+    const mainLines: OpeningVariant[] = [];
     popularViennaChapters.forEach(chapter => {
       if (chapter.variants.length > 0) {
-        const randIdx = Math.floor(Math.random() * chapter.variants.length);
-        chosenVariations.push(chapter.variants[randIdx]);
+        mainLines.push(chapter.variants[0]);
       }
     });
 
-    // Shuffle the selected variations to make it a true "rumble"
-    const shuffled = [...chosenVariations].sort(() => Math.random() - 0.5);
+    // Shuffle the main lines to make it a true "rumble" challenge
+    const shuffled = [...mainLines].sort(() => Math.random() - 0.5);
 
     setPlaylistMode('rumble');
     setPlaylistQueue(shuffled);
