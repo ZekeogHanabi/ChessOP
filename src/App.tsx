@@ -13,7 +13,6 @@ import {
   Compass,
   Zap,
   Info,
-  Layers,
   Search,
   ChevronDown
 } from 'lucide-react';
@@ -219,6 +218,7 @@ function App() {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [lastMoveComment, setLastMoveComment] = useState<string | null>(null);
   const [completedVariantsThisSession, setCompletedVariantsThisSession] = useState<string[]>([]);
+  const [showUnpopularChapters, setShowUnpopularChapters] = useState<boolean>(false);
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -509,28 +509,9 @@ function App() {
   const totalSuccesses = Object.values(userProgress).reduce((acc, curr) => acc + curr.successes, 0);
   const masteredOpenings = Object.values(userProgress).filter(p => p.successes > 0).length;
 
-  // Group Vienna Variations and filter to only keep highly useful theoretical lines
+  // Group Vienna Variations for filtering stats
   const viennaVariants = useMemo(() => {
-    const VIENNA_UTILITY_ORDER = [
-      "Vienna Gambit: Accepted",
-      "Vienna Gambit: Main Line",
-      "Vienna Gambit: Declined 3... Nf6",
-      "Vienna Gambit: Declined 3... d6",
-      "Vienna Hybrid: Main Line",
-      "Vienna Copycat: Main Line",
-      "Vienna Mieses: Main Line",
-      "Hamppe-Meitner Variation",
-      "Jeanisch Gambit: Accepted",
-      "Vienna Gambit: Paulsen Attack",
-      "Vienna Open Variation"
-    ];
-
-    const isViennaUseful = (title?: string): boolean => {
-      if (!title) return false;
-      return VIENNA_UTILITY_ORDER.some(key => title.toLowerCase().includes(key.toLowerCase()));
-    };
-
-    return variants.filter(v => v.openingName === 'Vienna Repertoire' && isViennaUseful(v.chapterName));
+    return variants.filter(v => v.openingName === 'Vienna Repertoire');
   }, [variants]);
   
   // Stats specifically for Vienna Repertoire
@@ -605,7 +586,8 @@ function App() {
     return chapters.filter(ch => ch.category === 'Default Repertoire');
   }, [chapters]);
 
-  const viennaChapters = useMemo(() => {
+  // Curated list of popular theoretical chapters
+  const popularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
       "Vienna Gambit: Accepted",
       "Vienna Gambit: Main Line",
@@ -626,17 +608,52 @@ function App() {
     };
 
     const list = chapters.filter(ch => ch.category === 'Vienna Repertoire');
-    return [...list].sort((a, b) => getViennaUtilityScore(a.title) - getViennaUtilityScore(b.title));
+    const popularList = list.filter(ch => getViennaUtilityScore(ch.title) !== 99);
+    return [...popularList].sort((a, b) => getViennaUtilityScore(a.title) - getViennaUtilityScore(b.title));
   }, [chapters]);
 
-  // Filter Vienna chapters based on search query in the Vienna Directory
-  const filteredViennaChapters = useMemo(() => {
+  // Rest of the chapters in the study (not so popular)
+  const unpopularViennaChapters = useMemo(() => {
+    const VIENNA_UTILITY_ORDER = [
+      "Vienna Gambit: Accepted",
+      "Vienna Gambit: Main Line",
+      "Vienna Gambit: Declined 3... Nf6",
+      "Vienna Gambit: Declined 3... d6",
+      "Vienna Hybrid: Main Line",
+      "Vienna Copycat: Main Line",
+      "Vienna Mieses: Main Line",
+      "Hamppe-Meitner Variation",
+      "Jeanisch Gambit: Accepted",
+      "Vienna Gambit: Paulsen Attack",
+      "Vienna Open Variation"
+    ];
+
+    const isPopular = (title: string): boolean => {
+      return VIENNA_UTILITY_ORDER.some(key => title.toLowerCase().includes(key.toLowerCase()));
+    };
+
+    const list = chapters.filter(ch => ch.category === 'Vienna Repertoire');
+    const unpopularList = list.filter(ch => !isPopular(ch.title));
+    return [...unpopularList].sort((a, b) => (a.chapterIndex || 0) - (b.chapterIndex || 0));
+  }, [chapters]);
+
+  // Filter popular Vienna chapters based on search query
+  const filteredPopularChapters = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return viennaChapters.filter(ch =>
+    return popularViennaChapters.filter(ch =>
       ch.title.toLowerCase().includes(query) ||
       ch.description.toLowerCase().includes(query)
     );
-  }, [viennaChapters, searchQuery]);
+  }, [popularViennaChapters, searchQuery]);
+
+  // Filter unpopular Vienna chapters based on search query
+  const filteredUnpopularChapters = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return unpopularViennaChapters.filter(ch =>
+      ch.title.toLowerCase().includes(query) ||
+      ch.description.toLowerCase().includes(query)
+    );
+  }, [unpopularViennaChapters, searchQuery]);
 
   // Find the next variation in the same chapter if any
   const nextVariantInChapter = useMemo(() => {
@@ -655,6 +672,143 @@ function App() {
       ...prev,
       [chapterId]: !prev[chapterId]
     }));
+  };
+
+  const renderChapterCard = (chapter: any) => {
+    const totalSuccesses = chapter.variants.reduce((acc: number, v: any) => acc + (userProgress[v.id]?.successes || 0), 0);
+    const masteredCount = chapter.variants.filter((v: any) => (userProgress[v.id]?.successes || 0) > 0).length;
+    const isAllMastered = masteredCount === chapter.variants.length;
+
+    return (
+      <div
+        key={chapter.id}
+        className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden animate-fadeIn"
+      >
+        <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
+        
+        <div className="space-y-3">
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
+                Chapter {chapter.chapterIndex} • Vienna Opening
+              </span>
+              <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
+                {chapter.title}
+              </h4>
+            </div>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
+              chapter.side === 'white'
+                ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
+                : 'bg-brand-dark text-white border border-brand-dark'
+            }`}>
+              {chapter.side === 'white' ? 'White' : 'Black'}
+            </span>
+          </div>
+          
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
+            {chapter.description}
+          </p>
+        </div>
+
+        {/* Chapter Action Details */}
+        <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+          {chapter.variants.length === 1 ? (
+            /* Case A: Chapter only has 1 line */
+            <div className="flex justify-between items-center gap-4">
+              <div className="flex items-center space-x-2 text-[10px]">
+                {userProgress[chapter.variants[0].id]?.demoCompleted ? (
+                  <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                    <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
+                  </span>
+                ) : (
+                  <span className="text-neutral-450 font-medium flex items-center">
+                    <Info size={12} className="mr-0.5" /> Demo Pending
+                  </span>
+                )}
+                {totalSuccesses > 0 && (
+                  <span className="text-brand-primary font-bold">
+                    {totalSuccesses}x
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={() => startVariant(chapter.variants[0])}
+                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+              >
+                <Play size={12} className="fill-white" /> Train
+              </button>
+            </div>
+          ) : (
+            /* Case B: Chapter has multiple subvariations */
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-neutral-400 font-semibold">
+                  {chapter.variants.length} variations • {masteredCount} / {chapter.variants.length} Mastered
+                </span>
+                {isAllMastered && (
+                  <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
+                    <Award size={12} className="mr-0.5" /> Mastered!
+                  </span>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center gap-2 pt-1">
+                <button
+                  onClick={() => startVariant(chapter.variants[0])}
+                  className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer font-bold"
+                >
+                  <Play size={12} className="fill-white" /> Train
+                </button>
+                
+                <button
+                  onClick={() => toggleChapterExpand(chapter.id)}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  <span>{expandedChapters[chapter.id] ? 'Hide' : 'Choose Variation'}</span>
+                  <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Expanded Subvariations List */}
+              {expandedChapters[chapter.id] && (
+                <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
+                  {chapter.variants.map((variant: any) => {
+                    const prog = userProgress[variant.id];
+                    const isDemoDone = prog?.demoCompleted ?? false;
+                    const successes = prog?.successes ?? 0;
+                    return (
+                      <div
+                        key={variant.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-neutral-55 dark:bg-neutral-855 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
+                      >
+                        <div className="space-y-0.5 pr-2 max-w-[70%]">
+                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                            {variant.name}
+                          </div>
+                          <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
+                            <span>{variant.moves.length} plies</span>
+                            {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
+                            {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => startVariant(variant)}
+                          className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
+                        >
+                          <Play size={10} className="fill-white" /> Train
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+      </div>
+    );
   };
 
   return (
@@ -1007,18 +1161,17 @@ function App() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase flex items-center gap-1">
-                            <Layers size={11} /> Dynamic PGN study
+                          <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
+                            Vienna Game
                           </span>
                           <h4 className="text-lg font-black tracking-tight mt-0.5">Vienna Opening Repertoire</h4>
                         </div>
                         <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                          White & Black
+                          White
                         </span>
                       </div>
                       <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                        A massive, fully structured dynamic study of the Vienna Opening, loaded in real-time from your PGN.
-                        Features **{viennaChapters.length} chapters** and all alternative subvariations.
+                        A highly practical and active-recall repertoire for the Vienna Game (1.e4 e5 2.Nc3). Master the signature Vienna Gambit and all major lines using dynamic, chapter-level training.
                       </p>
                     </div>
 
@@ -1092,152 +1245,38 @@ function App() {
               />
             </div>
 
-            {/* Grid of Selectable Chapter Cards */}
+            {/* Grid of Selectable Chapter Cards (Popular ones) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredViennaChapters.length > 0 ? (
-                filteredViennaChapters.map((chapter) => {
-                  const totalSuccesses = chapter.variants.reduce((acc, v) => acc + (userProgress[v.id]?.successes || 0), 0);
-                  const masteredCount = chapter.variants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
-                  const isAllMastered = masteredCount === chapter.variants.length;
-
-                  return (
-                    <div
-                      key={chapter.id}
-                      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
-                      
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
-                              Chapter {chapter.chapterIndex} • Vienna Opening
-                            </span>
-                            <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
-                              {chapter.title}
-                            </h4>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-                            chapter.side === 'white'
-                              ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
-                              : 'bg-brand-dark text-white border border-brand-dark'
-                          }`}>
-                            {chapter.side === 'white' ? 'White' : 'Black'}
-                          </span>
-                        </div>
-                        
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
-                          {chapter.description}
-                        </p>
-                      </div>
-
-                      {/* Chapter Action Details */}
-                      <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
-                        {chapter.variants.length === 1 ? (
-                          /* Case A: Chapter only has 1 line */
-                          <div className="flex justify-between items-center gap-4">
-                            <div className="flex items-center space-x-2 text-[10px]">
-                              {userProgress[chapter.variants[0].id]?.demoCompleted ? (
-                                <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                                  <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
-                                </span>
-                              ) : (
-                                <span className="text-neutral-450 font-medium flex items-center">
-                                  <Info size={12} className="mr-0.5" /> Demo Pending
-                                </span>
-                              )}
-                              {totalSuccesses > 0 && (
-                                <span className="text-brand-primary font-bold">
-                                  {totalSuccesses}x
-                                </span>
-                              )}
-                            </div>
-
-                            <button
-                              onClick={() => startVariant(chapter.variants[0])}
-                              className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                            >
-                              <Play size={12} className="fill-white" /> Train
-                            </button>
-                          </div>
-                        ) : (
-                          /* Case B: Chapter has multiple subvariations */
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className="text-neutral-400 font-semibold">
-                                {chapter.variants.length} variations • {masteredCount} / {chapter.variants.length} Mastered
-                              </span>
-                              {isAllMastered && (
-                                <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
-                                  <Award size={12} className="mr-0.5" /> Mastered!
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex justify-between items-center gap-2 pt-1">
-                              <button
-                                onClick={() => startVariant(chapter.variants[0])}
-                                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer font-bold"
-                              >
-                                <Play size={12} className="fill-white" /> Train
-                              </button>
-                              
-                              <button
-                                onClick={() => toggleChapterExpand(chapter.id)}
-                                className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
-                              >
-                                <span>{expandedChapters[chapter.id] ? 'Hide' : 'Choose Variation'}</span>
-                                <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
-                              </button>
-                            </div>
-
-                            {/* Expanded Subvariations List */}
-                            {expandedChapters[chapter.id] && (
-                              <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
-                                {chapter.variants.map((variant) => {
-                                  const prog = userProgress[variant.id];
-                                  const isDemoDone = prog?.demoCompleted ?? false;
-                                  const successes = prog?.successes ?? 0;
-                                  return (
-                                    <div
-                                      key={variant.id}
-                                      className="flex items-center justify-between p-2 rounded-lg bg-neutral-55 dark:bg-neutral-855 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
-                                    >
-                                      <div className="space-y-0.5 pr-2 max-w-[70%]">
-                                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                                          {variant.name}
-                                        </div>
-                                        <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
-                                          <span>{variant.moves.length} plies</span>
-                                          {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
-                                          {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
-                                        </div>
-                                      </div>
-                                      <button
-                                        onClick={() => startVariant(variant)}
-                                        className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
-                                      >
-                                        <Play size={10} className="fill-white" /> Train
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl">
+              {filteredPopularChapters.length > 0 ? (
+                filteredPopularChapters.map((chapter) => renderChapterCard(chapter))
+              ) : searchQuery && filteredUnpopularChapters.length === 0 ? (
+                <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl animate-fadeIn">
                   <Compass className="mx-auto text-neutral-350 mb-3 animate-pulse" size={36} />
                   <p className="text-sm font-medium">No chapters found matching your search</p>
                 </div>
-              )}
+              ) : null}
             </div>
+
+            {/* Unpopular Chapters Collapsible Section */}
+            {filteredUnpopularChapters.length > 0 && (
+              <div className="pt-8 border-t border-neutral-200 dark:border-neutral-800/80 mt-12 space-y-6">
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowUnpopularChapters(!showUnpopularChapters)}
+                    className="px-6 py-2.5 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-850 hover:border-brand-primary/40 dark:hover:border-brand-primary/30 transition-all font-bold text-xs shadow-sm cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] text-neutral-500 dark:text-neutral-400"
+                  >
+                    <span>{showUnpopularChapters ? 'Hide not so popular variations' : 'Not so popular variations'}</span>
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${showUnpopularChapters ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+
+                {(showUnpopularChapters || searchQuery) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
+                    {filteredUnpopularChapters.map((chapter) => renderChapterCard(chapter))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
