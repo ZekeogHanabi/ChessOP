@@ -219,6 +219,10 @@ function App() {
   const [lastMoveComment, setLastMoveComment] = useState<string | null>(null);
   const [completedVariantsThisSession, setCompletedVariantsThisSession] = useState<string[]>([]);
   const [showUnpopularChapters, setShowUnpopularChapters] = useState<boolean>(false);
+  const [playlistMode, setPlaylistMode] = useState<'none' | 'rumble' | 'study'>('none');
+  const [playlistQueue, setPlaylistQueue] = useState<OpeningVariant[]>([]);
+  const [playlistOriginalSize, setPlaylistOriginalSize] = useState<number>(0);
+  const [playlistIndex, setPlaylistIndex] = useState<number>(0);
 
   // --- Load Dynamic PGN File on Startup ---
   useEffect(() => {
@@ -452,6 +456,31 @@ function App() {
     localStorage.setItem('chessop_progress', JSON.stringify(updatedProgress));
 
     // Handle transition / victory state
+    if (playlistMode !== 'none') {
+      const nextIdx = playlistIndex + 1;
+      if (nextIdx < playlistQueue.length) {
+        setPlaylistIndex(nextIdx);
+        const nextVar = playlistQueue[nextIdx];
+        const transitionText = playlistMode === 'rumble'
+          ? `Rumble variation completed! Loading next chapter challenge: ${nextVar.chapterName}...`
+          : `Main line completed! Loading next main study line: ${nextVar.chapterName}...`;
+        
+        setFeedbackMessage(transitionText);
+        setTimeout(() => {
+          startVariant(nextVar, isDemoMode);
+        }, 1800);
+        return;
+      } else {
+        setIsCompleted(true);
+        const victoryText = playlistMode === 'rumble'
+          ? 'Rumble Challenge Conquered! You completed a variation from all 11 principal chapters!'
+          : 'Study Repertoire Mastered! You completed the Main Lines of all 11 principal chapters!';
+        setFeedbackMessage(victoryText);
+        setPlaylistMode('none');
+        return;
+      }
+    }
+
     if (variant.chapterName) {
       const chapter = chapters.find(ch => ch.title === variant.chapterName);
       if (chapter && chapter.variants.length > 1) {
@@ -487,6 +516,7 @@ function App() {
     setIsCompleted(false);
     setLastMoveComment(null);
     setFeedbackMessage(null);
+    setPlaylistMode('none');
   };
 
   // --- Get Demonstration Guide Arrow (react-chessboard v4 double array shape) ---
@@ -666,6 +696,52 @@ function App() {
     }
     return null;
   }, [currentVariant, chapters]);
+
+  // --- Start Rumble Challenge Mode ---
+  const startRumbleChallenge = () => {
+    if (popularViennaChapters.length === 0) return;
+
+    // For each chapter, pick a random variation from its variants
+    const chosenVariations: OpeningVariant[] = [];
+    popularViennaChapters.forEach(chapter => {
+      if (chapter.variants.length > 0) {
+        const randIdx = Math.floor(Math.random() * chapter.variants.length);
+        chosenVariations.push(chapter.variants[randIdx]);
+      }
+    });
+
+    // Shuffle the selected variations to make it a true "rumble"
+    const shuffled = [...chosenVariations].sort(() => Math.random() - 0.5);
+
+    setPlaylistMode('rumble');
+    setPlaylistQueue(shuffled);
+    setPlaylistOriginalSize(shuffled.length);
+    setPlaylistIndex(0);
+
+    // Start training the first random variation in Practice Mode (demoOverride = false since it is a challenge!)
+    startVariant(shuffled[0], false);
+  };
+
+  // --- Start Study Main Lines Mode ---
+  const startStudyMainLines = () => {
+    if (popularViennaChapters.length === 0) return;
+
+    // Collect the Main Line (variants[0]) of each popular chapter in their sorted popular order
+    const mainLines: OpeningVariant[] = [];
+    popularViennaChapters.forEach(chapter => {
+      if (chapter.variants.length > 0) {
+        mainLines.push(chapter.variants[0]);
+      }
+    });
+
+    setPlaylistMode('study');
+    setPlaylistQueue(mainLines);
+    setPlaylistOriginalSize(mainLines.length);
+    setPlaylistIndex(0);
+
+    // Start training the first main line in Demo Mode by default (or practice if preferred, but demo is great for studying)
+    startVariant(mainLines[0], true);
+  };
 
   const toggleChapterExpand = (chapterId: string) => {
     setExpandedChapters(prev => ({
@@ -878,7 +954,17 @@ function App() {
                 
                 <div>
                   <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
-                    {currentVariant.openingName}
+                    {playlistMode === 'rumble' ? (
+                      <span className="flex items-center gap-1 text-red-500 font-black animate-pulse">
+                        <Zap size={11} className="fill-red-500" /> Rumble Challenge ({playlistIndex + 1} / {playlistOriginalSize})
+                      </span>
+                    ) : playlistMode === 'study' ? (
+                      <span className="flex items-center gap-1 text-brand-primary font-black">
+                        <BookOpen size={11} /> Study Playlist ({playlistIndex + 1} / {playlistOriginalSize})
+                      </span>
+                    ) : (
+                      currentVariant.openingName
+                    )}
                   </span>
                   <h3 className="text-xl font-black tracking-tight leading-tight">{currentVariant.chapterName || currentVariant.name}</h3>
                   {currentVariant.chapterName && (
@@ -1207,12 +1293,35 @@ function App() {
                 Back to Main Menu
               </button>
               
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Vienna Directory</h2>
-                  <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
-                    Explore, select, and practice all chapters and alternative subvariations parsed from your Lichess study.
-                  </p>
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                  <div>
+                    <h2 className="text-3xl font-extrabold tracking-tight">Vienna Directory</h2>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
+                      Explore, select, and practice all chapters and alternative subvariations parsed from your Lichess study.
+                    </p>
+                  </div>
+                  
+                  {/* Playlist Action Buttons */}
+                  <div className="flex gap-3 mt-2 md:mt-0 shrink-0">
+                    <button
+                      onClick={startRumbleChallenge}
+                      className="px-5 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs shadow transition-all active:scale-[0.98] cursor-pointer flex items-center gap-1.5 border border-brand-primary select-none font-bold"
+                      title="Train in a random survival checklist challenge"
+                    >
+                      <Zap size={14} className="fill-white animate-pulse" />
+                      Rumble Challenge
+                    </button>
+                    
+                    <button
+                      onClick={startStudyMainLines}
+                      className="px-5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-850 hover:border-brand-primary/45 dark:hover:border-brand-primary/30 transition-all font-bold text-xs shadow-sm active:scale-[0.98] cursor-pointer flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300 select-none font-bold"
+                      title="Study the critical Main Lines of all 11 popular chapters sequentially"
+                    >
+                      <BookOpen size={14} />
+                      Study Main Lines
+                    </button>
+                  </div>
                 </div>
 
                 {/* Vienna Specific Stats Banner */}
