@@ -538,6 +538,18 @@ function App() {
     );
   }, [viennaChapters, searchQuery]);
 
+  // Find the next variation in the same chapter if any
+  const nextVariantInChapter = useMemo(() => {
+    if (!currentVariant || !currentVariant.chapterName) return null;
+    const chapter = chapters.find(ch => ch.title === currentVariant.chapterName);
+    if (!chapter) return null;
+    const variantIndex = chapter.variants.findIndex(v => v.id === currentVariant.id);
+    if (variantIndex !== -1 && variantIndex < chapter.variants.length - 1) {
+      return chapter.variants[variantIndex + 1];
+    }
+    return null;
+  }, [currentVariant, chapters]);
+
   const toggleChapterExpand = (chapterId: string) => {
     setExpandedChapters(prev => ({
       ...prev,
@@ -760,6 +772,16 @@ function App() {
                     >
                       {isDemoMode ? 'Try Practice Mode' : 'Practice again'}
                     </button>
+                    {nextVariantInChapter && (
+                      <button
+                        onClick={() => {
+                          startVariant(nextVariantInChapter, isDemoMode);
+                        }}
+                        className="px-3 py-1 rounded bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Next Variation
+                      </button>
+                    )}
                     <button
                       onClick={resetToMenu}
                       className="px-3 py-1 rounded bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
@@ -1043,7 +1065,7 @@ function App() {
                           <div className="space-y-3">
                             <div className="flex justify-between items-center text-[10px]">
                               <span className="text-neutral-400 font-semibold">
-                                {masteredCount} / {chapter.variants.length} Mastered
+                                {chapter.variants.length} variations • {masteredCount} / {chapter.variants.length} Mastered
                               </span>
                               {isAllMastered && (
                                 <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
@@ -1053,9 +1075,12 @@ function App() {
                             </div>
 
                             <div className="flex justify-between items-center gap-2 pt-1">
-                              <span className="text-[11px] text-neutral-500 font-medium dark:text-neutral-400">
-                                {chapter.variants.length} subvariations
-                              </span>
+                              <button
+                                onClick={() => startVariant(chapter.variants[0])}
+                                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer font-bold"
+                              >
+                                <Play size={12} className="fill-white" /> Train
+                              </button>
                               
                               <button
                                 onClick={() => toggleChapterExpand(chapter.id)}
