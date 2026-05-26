@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
-import { Chessboard, ChessboardProvider } from 'react-chessboard';
+import { Chessboard } from 'react-chessboard';
 import {
   BookOpen,
   Award,
@@ -16,24 +16,6 @@ import {
 } from 'lucide-react';
 import { OPENING_VARIANTS } from './data/openings';
 import { OpeningVariant, UserProgress } from './types';
-
-interface PieceDropArgs {
-  piece?: { isSparePiece: boolean; position: string; pieceType: string };
-  sourceSquare?: string;
-  targetSquare?: string | null;
-}
-
-interface PieceDragArgs {
-  isSparePiece: boolean;
-  piece: { pieceType: string };
-  square: string | null;
-}
-
-interface ChessboardArrow {
-  startSquare: string;
-  endSquare: string;
-  color: string;
-}
 
 function App() {
   // --- Navigation & Theme State ---
@@ -131,24 +113,9 @@ function App() {
     }
   };
 
-  // --- Drag & Drop Handler (API v5 and v4 compatible) ---
-  const handlePieceDrop = (arg1: PieceDropArgs | string, arg2?: string): boolean => {
+  // --- Drag & Drop Handler (API v4 Signature) ---
+  const handlePieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
     if (!currentVariant || isCompleted || boardError) return false;
-
-    let sourceSquare = '';
-    let targetSquare: string | null = null;
-
-    if (arg2 !== undefined && typeof arg1 === 'string' && typeof arg2 === 'string') {
-      // Traditional three-argument format: onPieceDrop(sourceSquare, targetSquare, piece)
-      sourceSquare = arg1;
-      targetSquare = arg2;
-    } else if (arg1 && typeof arg1 === 'object') {
-      // Destructured single object format: onPieceDrop({ piece, sourceSquare, targetSquare })
-      sourceSquare = arg1.sourceSquare || '';
-      targetSquare = arg1.targetSquare || null;
-    }
-
-    if (!sourceSquare || !targetSquare) return false;
 
     const expectedMove = currentVariant.moves[currentIndex];
     if (!expectedMove) return false;
@@ -258,8 +225,8 @@ function App() {
     setFeedbackMessage(null);
   };
 
-  // --- Get Demonstration Guide Arrow ---
-  const getDemoArrows = (): ChessboardArrow[] | undefined => {
+  // --- Get Demonstration Guide Arrow (react-chessboard v4 double array shape) ---
+  const getDemoArrows = (): [string, string, string][] | undefined => {
     if (!isDemoMode || !currentVariant || isCompleted) return undefined;
 
     const expectedMove = currentVariant.moves[currentIndex];
@@ -268,31 +235,9 @@ function App() {
       : currentIndex % 2 === 1;
 
     if (expectedMove && isUserTurn) {
-      return [{
-        startSquare: expectedMove.from,
-        endSquare: expectedMove.to,
-        color: 'rgba(140, 106, 92, 0.7)'
-      }];
+      return [[expectedMove.from, expectedMove.to, 'rgba(140, 106, 92, 0.7)']];
     }
     return undefined;
-  };
-
-  // --- Configure react-chessboard v5 Options ---
-  const getBoardOptions = () => {
-    if (!currentVariant) return {};
-    return {
-      position: gameFen,
-      onPieceDrop: handlePieceDrop,
-      boardOrientation: currentVariant.side,
-      arrows: getDemoArrows(),
-      canDragPiece: (args: PieceDragArgs) => {
-        if (!args || !args.piece || !args.piece.pieceType) return false;
-        return args.piece.pieceType[0] === currentVariant.side[0];
-      },
-      darkSquareStyle: { backgroundColor: 'var(--color-board-dark)' },
-      lightSquareStyle: { backgroundColor: 'var(--color-board-light)' },
-      animationDurationInMs: 250,
-    };
   };
 
   // --- Calculate Global Statistics ---
@@ -581,9 +526,16 @@ function App() {
                     : 'border-white dark:border-neutral-850'
                 }`}
               >
-                <ChessboardProvider options={getBoardOptions()}>
-                  <Chessboard />
-                </ChessboardProvider>
+                <Chessboard
+                  position={gameFen}
+                  onPieceDrop={handlePieceDrop}
+                  boardOrientation={currentVariant.side}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  customArrows={getDemoArrows() as any}
+                  customDarkSquareStyle={{ backgroundColor: 'var(--color-board-dark)' }}
+                  customLightSquareStyle={{ backgroundColor: 'var(--color-board-light)' }}
+                  animationDuration={250}
+                />
               </div>
 
               {/* Victory Overlay Panel */}
