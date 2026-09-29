@@ -50,6 +50,8 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { BoardThemeSelectorModal } from './components/BoardThemeSelectorModal';
 import { ImportPgnModal } from './components/ImportPgnModal';
 import { PieceSetSelectorModal } from './components/PieceSetSelectorModal';
+import { InstallAppModal } from './components/InstallAppModal';
+import { usePwaInstall } from './utils/usePwaInstall';
 
 function App() {
   // --- Repertoire State ---
@@ -73,6 +75,10 @@ function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
   const [isPieceModalOpen, setIsPieceModalOpen] = useState<boolean>(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
+
+  // --- PWA Installation Hook ---
+  const { canInstall, isInstalled, isIOS, promptInstall } = usePwaInstall();
 
   // --- Board Theme & Sound State ---
   const [boardThemeId, setBoardThemeId] = useState<BoardThemeId>(() => {
@@ -1377,6 +1383,8 @@ function App() {
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onOpenAnalytics={() => { resetToMenu(); setActiveView('analytics'); }}
         onOpenCampaign={openCampaign}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
+        canInstall={canInstall && !isInstalled}
         onResetToMenu={resetToMenu}
         gamificationProfile={gamificationProfile}
       />
@@ -1566,6 +1574,14 @@ function App() {
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
+      />
+
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        onInstall={promptInstall}
+        isIOS={isIOS}
+        canPromptDirectly={!isIOS}
       />
     </div>
   );

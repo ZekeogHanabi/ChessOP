@@ -10,7 +10,8 @@ import {
   Layers,
   BarChart3,
   Star,
-  Map
+  Map,
+  Smartphone
 } from 'lucide-react';
 import { GamificationProfile } from '../types';
 
@@ -25,6 +26,8 @@ interface Props {
   onOpenShortcutsModal: () => void;
   onOpenAnalytics: () => void;
   onOpenCampaign?: () => void;
+  onOpenInstallModal?: () => void;
+  canInstall?: boolean;
   onResetToMenu: () => void;
   gamificationProfile?: GamificationProfile;
 }
@@ -40,6 +43,8 @@ export const Header: React.FC<Props> = ({
   onOpenShortcutsModal,
   onOpenAnalytics,
   onOpenCampaign,
+  onOpenInstallModal,
+  canInstall,
   onResetToMenu,
   gamificationProfile
 }) => {
@@ -117,6 +122,19 @@ export const Header: React.FC<Props> = ({
         >
           <BarChart3 size={17} />
         </button>
+
+        {/* Install PWA App Button */}
+        {onOpenInstallModal && canInstall && (
+          <button
+            onClick={onOpenInstallModal}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors cursor-pointer relative"
+            title="Install ChessOp App (Offline & Standalone)"
+            aria-label="Install App"
+          >
+            <Smartphone size={17} />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          </button>
+        )}
 
         {/* Sound Toggle */}
         <button
