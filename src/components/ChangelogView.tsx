@@ -26,6 +26,52 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
       {/* Version List */}
       <div className="space-y-8">
+        {/* Version 1.0.6 */}
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                v1.0.6 • Curated Vienna Master Edition
+              </span>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Streamlined 8-Chapter Grandmaster Repertoire</h3>
+            </div>
+            <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+              Released: September 29, 2026
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+            <p>
+              Version 1.0.6 is a comprehensive overhaul of the built-in <strong>Vienna Game Repertoire</strong>. We replaced the previous 35-chapter legacy database with a curated, tournament-tested 8-chapter blueprint that eliminates noise and focuses purely on high-percentage, aggressive winning lines.
+            </p>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">♟️ 8 Essential Pillars of the Vienna Game</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Chapter 1 (3...d5 Main Line)</strong>: 5.Qf3! Steinitz-Paulsen attack with central space dominance.</li>
+                <li><strong>Chapter 2 (Accepted 3...exf4)</strong>: 4.e5! Qe7 5.Qe2! crushing the conceded pawn center.</li>
+                <li><strong>Chapter 3 (Declined 3...Nc6)</strong>: 4.fxe5! Nxe5 5.d4! building an unstoppable central roller.</li>
+                <li><strong>Chapter 4 (Declined 3...d6)</strong>: 4.Nf3! Bg4 5.h3! seizing the bishop pair and kingside attack.</li>
+                <li><strong>Chapter 5 (Copycat 3...Bc5)</strong>: 4.Qg4! Qf6 5.Nd5! trapping the queen after 5...Qxf2+.</li>
+                <li><strong>Chapter 6 (Hybrid 3...Nf6 & 4.d3)</strong>: Solid Italian structure leading to thematic f4-f5 breakthroughs.</li>
+                <li><strong>Chapter 7 (Classical 3...Na5)</strong>: 4.Be2! preserving the bishop pair with central harmony.</li>
+                <li><strong>Chapter 8 (Rare 2nd Moves)</strong>: Concrete refutations against 2...Bc5, 2...d6, and 2...f5.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">✨ Didactic Explanations & Zero Corrupted Lines</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>100% Cleaned Database</strong>: Removed obsolete, duplicated, and unplayable chapters (*Omaha, Burden, Nikolic, Cenni, Chapter 33*).</li>
+                <li><strong>High-Fidelity Commentary</strong>: Educational strategic annotations on every ply explaining White's concrete plan and opponent tactical pitfalls.</li>
+                <li><strong>Rebalanced Game Modes</strong>: The Rumble Challenge and Study Playlist now systematically drill the 8 core pillars.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Version 1.0.5 */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-12 -mt-12 pointer-events-none" />

@@ -768,12 +768,12 @@ function App() {
       } else {
         setIsCompleted(true);
         const victoryText = playlistMode === 'rumble'
-          ? 'Rumble Challenge Conquered! Mastered a line from all 11 principal chapters!'
+          ? 'Rumble Challenge Conquered! Mastered a line from all 8 principal chapters!'
           : playlistMode === 'srs'
           ? 'Daily Spaced Repetition Review Complete! Your memory is razor-sharp!'
           : playlistMode === 'weakspots'
           ? 'Weak Spots Overcome! You hammered your stumbling points into muscle memory!'
-          : 'Study Repertoire Mastered! Completed the Main Lines of all 11 principal chapters!';
+          : 'Study Repertoire Mastered! Completed the Main Lines of all 8 principal chapters!';
         setFeedbackMessage(victoryText);
         setPlaylistMode('none');
         return;
@@ -958,17 +958,14 @@ function App() {
 
   const popularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
-      "Vienna Gambit: Accepted",
-      "Vienna Gambit: Main Line",
-      "Vienna Gambit: Declined 3... Nf6",
-      "Vienna Gambit: Declined 3... d6",
-      "Vienna Hybrid: Main Line",
-      "Vienna Copycat: Main Line",
-      "Vienna Mieses: Main Line",
-      "Hamppe-Meitner Variation",
-      "Jeanisch Gambit: Accepted",
-      "Vienna Gambit: Paulsen Attack",
-      "Vienna Open Variation"
+      "3...d5 Main Line",
+      "Accepted 3...exf4",
+      "Declined 3...Nc6",
+      "Declined 3...d6",
+      "Vienna Copycat",
+      "Vienna Hybrid",
+      "Vienna Classical",
+      "Vienna Defenses"
     ];
 
     const getViennaUtilityScore = (title: string): number => {
@@ -983,17 +980,14 @@ function App() {
 
   const unpopularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
-      "Vienna Gambit: Accepted",
-      "Vienna Gambit: Main Line",
-      "Vienna Gambit: Declined 3... Nf6",
-      "Vienna Gambit: Declined 3... d6",
-      "Vienna Hybrid: Main Line",
-      "Vienna Copycat: Main Line",
-      "Vienna Mieses: Main Line",
-      "Hamppe-Meitner Variation",
-      "Jeanisch Gambit: Accepted",
-      "Vienna Gambit: Paulsen Attack",
-      "Vienna Open Variation"
+      "3...d5 Main Line",
+      "Accepted 3...exf4",
+      "Declined 3...Nc6",
+      "Declined 3...d6",
+      "Vienna Copycat",
+      "Vienna Hybrid",
+      "Vienna Classical",
+      "Vienna Defenses"
     ];
 
     const isPopular = (title: string): boolean => {
@@ -1102,7 +1096,7 @@ function App() {
       pieceSetId,
       bestStreak,
       exportedAt: new Date().toISOString(),
-      version: '1.0.5'
+      version: '1.0.6'
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1389,7 +1383,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.5"
+        version="v1.0.6"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);

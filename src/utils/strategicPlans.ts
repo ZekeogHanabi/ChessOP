@@ -111,6 +111,55 @@ export const STRATEGIC_PLANS: Record<string, StrategicPlan> = {
     ]
   },
 
+  // --- VIENNA COPYCAT (4.Qg4!) ---
+  'vienna-copycat': {
+    title: 'Vienna Copycat: 4.Qg4! Venomous Queen Attack',
+    keyIdea: 'White punishes Black\'s symmetrical 3...Bc5 by launching the queen directly to g4, threatening g7 and sacrificing f2 for a decisive knight invasion with Nd5.',
+    pawnBreaks: [
+      'd2-d3 (Securing the c4 bishop and opening the dark bishop diagonal)',
+      'c2-c3 (Preparing to snare and trap the overextended black queen)'
+    ],
+    pieceGoals: [
+      'Qg4: Dominates g7 and forces king dislocation (...Kf8 or ...g6)',
+      'Nd5: Central outpost fork with devastating threats on c7 and f7',
+      'Nh3 -> Ng5: Pouncing on f7 with overwhelming attack'
+    ],
+    tacticalThemes: [
+      'Queen trapping on c5 after ...Qxf2+ Kd1 and d3/c3',
+      'Sacrificial battery along the f-file with Rf1 and Qf3'
+    ],
+    recommendedArrows: [
+      ['d1', 'g4', 'rgba(234, 179, 8, 0.85)'],
+      ['c3', 'd5', 'rgba(239, 68, 68, 0.85)'],
+      ['c4', 'f7', 'rgba(239, 68, 68, 0.85)']
+    ]
+  },
+
+  // --- VIENNA GAMBIT DECLINED ---
+  'vienna-declined': {
+    title: 'Vienna Gambit: Punishing Declined Setups (3...Nc6 & 3...d6)',
+    keyIdea: 'When Black refuses the gambit with 3...Nc6 or 3...d6, White captures fxe5, seizes the full center with d4, and kicks Black\'s knights backwards with e5.',
+    pawnBreaks: [
+      'f4xe5 (Obliterating Black\'s central resistance)',
+      'd2-d4 (Establishing a dominant central pawn roller)',
+      'e4-e5 (Driving Black\'s minor pieces into retreat)'
+    ],
+    pieceGoals: [
+      'd4 + e5: The unstoppable central pawn pair',
+      'Bc4 / Bd3: Developing bishops onto commanding attacking diagonals',
+      'Nf3 & O-O: Fast harmonious king safety'
+    ],
+    tacticalThemes: [
+      'Forking minor pieces with d4-d5 and e5-e6',
+      'Pawn storm on the kingside with f5 and g4-g5 against ...d6'
+    ],
+    recommendedArrows: [
+      ['f4', 'e5', 'rgba(239, 68, 68, 0.85)'],
+      ['d2', 'd4', 'rgba(59, 130, 246, 0.85)'],
+      ['e4', 'e5', 'rgba(234, 179, 8, 0.85)']
+    ]
+  },
+
   // --- SICILIAN NAJDORF ---
   'sicilian-najdorf': {
     title: 'Sicilian Najdorf: Dynamic Asymmetry',
@@ -197,10 +246,16 @@ export const getStrategicPlan = (variant: OpeningVariant): StrategicPlan => {
   const openingLower = (variant.openingName || '').toLowerCase();
 
   // 1. Check curated keys
-  if (chapterLower.includes('gambit: accepted') || nameLower.includes('gambit: accepted')) {
+  if (chapterLower.includes('copycat') || nameLower.includes('copycat') || chapterLower.includes('qg4')) {
+    return STRATEGIC_PLANS['vienna-copycat'];
+  }
+  if (chapterLower.includes('declined') || nameLower.includes('declined')) {
+    return STRATEGIC_PLANS['vienna-declined'];
+  }
+  if (chapterLower.includes('accepted') || nameLower.includes('accepted')) {
     return STRATEGIC_PLANS['vienna-gambit-accepted'];
   }
-  if (chapterLower.includes('gambit: main') || nameLower.includes('gambit: main')) {
+  if (chapterLower.includes('3...d5') || chapterLower.includes('main line') || nameLower.includes('main line')) {
     return STRATEGIC_PLANS['vienna-gambit-main-line'];
   }
   if (chapterLower.includes('hybrid') || nameLower.includes('hybrid')) {
