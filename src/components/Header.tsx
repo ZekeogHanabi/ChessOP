@@ -8,8 +8,10 @@ import {
   Upload,
   Keyboard,
   Layers,
-  BarChart3
+  BarChart3,
+  Star
 } from 'lucide-react';
+import { GamificationProfile } from '../types';
 
 interface Props {
   theme: 'light' | 'dark';
@@ -22,6 +24,7 @@ interface Props {
   onOpenShortcutsModal: () => void;
   onOpenAnalytics: () => void;
   onResetToMenu: () => void;
+  gamificationProfile?: GamificationProfile;
 }
 
 export const Header: React.FC<Props> = ({
@@ -34,7 +37,8 @@ export const Header: React.FC<Props> = ({
   onOpenImportModal,
   onOpenShortcutsModal,
   onOpenAnalytics,
-  onResetToMenu
+  onResetToMenu,
+  gamificationProfile
 }) => {
   return (
     <header className="border-b border-neutral-200 dark:border-neutral-800 py-3.5 px-6 md:px-12 flex justify-between items-center bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm sticky top-0 z-30">
@@ -51,6 +55,41 @@ export const Header: React.FC<Props> = ({
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Opening Repertoire Trainer</p>
         </div>
       </div>
+
+      {/* Player Gamification Level & XP Progress Pill */}
+      {gamificationProfile && (
+        <div
+          onClick={onOpenAnalytics}
+          className="hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700/80 cursor-pointer hover:border-brand-primary/40 transition-all shadow-xs group"
+          title={`Nivel ${gamificationProfile.level}: ${gamificationProfile.title} (${gamificationProfile.totalXp} XP)`}
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-black text-[11px] flex items-center justify-center">
+              {gamificationProfile.level}
+            </span>
+            <span className="text-xs font-black text-neutral-800 dark:text-neutral-200 group-hover:text-brand-primary transition-colors">
+              {gamificationProfile.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 border-l border-neutral-200 dark:border-neutral-700 pl-2.5">
+            <Star size={13} className="fill-amber-400 text-amber-400" />
+            <span>{gamificationProfile.totalStars}</span>
+          </div>
+
+          <div className="hidden md:flex flex-col gap-0.5 w-16">
+            <div className="w-full bg-neutral-200 dark:bg-neutral-700 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-brand-primary h-full rounded-full transition-all duration-300"
+                style={{ width: `${gamificationProfile.currentLevelProgress}%` }}
+              />
+            </div>
+            <span className="text-[9px] font-semibold text-neutral-400 text-right leading-none">
+              {gamificationProfile.totalXp} XP
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar actions */}
       <div className="flex items-center space-x-1.5 md:space-x-2">

@@ -80,3 +80,22 @@ export interface StrategicPlan {
   recommendedArrows: BoardArrow[];
 }
 
+export type StarRating = 1 | 2 | 3;
+
+export interface MoveFeedbackBadge {
+  type: 'book' | 'key' | 'best' | 'mistake' | 'combo';
+  text: string;
+  subtext?: string;
+}
+
+export interface GamificationProfile {
+  totalXp: number;
+  level: number;
+  title: string;
+  nextLevelXp: number;
+  currentLevelProgress: number; // 0 - 100%
+  stars: Record<string, StarRating>;
+  totalStars: number;
+}
+
+

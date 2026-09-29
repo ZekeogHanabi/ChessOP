@@ -22,7 +22,9 @@ import {
   Undo2,
   ChevronDown,
   ChevronUp,
-  Eye
+  Eye,
+  Star,
+  Trophy
 } from 'lucide-react';
 import {
   OpeningVariant,
@@ -33,7 +35,10 @@ import {
   PositionEvaluation,
   UserProgress,
   BotDifficulty,
-  BoardArrow
+  BoardArrow,
+  MoveFeedbackBadge,
+  GamificationProfile,
+  StarRating
 } from '../types';
 import { BranchExplorer } from './BranchExplorer';
 import { getStrategicPlan } from '../utils/strategicPlans';
@@ -83,6 +88,12 @@ interface Props {
   onResetSparringPosition: () => void;
   onTakebackSparringMove: () => void;
   onSetBotDifficulty: (difficulty: BotDifficulty) => void;
+  // Gamification & Precision Props
+  precision: number;
+  activeBadge: MoveFeedbackBadge | null;
+  gamificationProfile: GamificationProfile;
+  lastXpGained?: number;
+  starsEarned?: StarRating;
   // Handlers
   onPieceDrop: (sourceSquare: string, targetSquare: string) => boolean;
   onSquareClick: (square: string) => void;
@@ -140,6 +151,12 @@ export const TrainingView: React.FC<Props> = ({
   onResetSparringPosition,
   onTakebackSparringMove,
   onSetBotDifficulty,
+  // Gamification & Precision
+  precision,
+  activeBadge,
+  gamificationProfile,
+  lastXpGained,
+  starsEarned,
   // Handlers
   onPieceDrop,
   onSquareClick,
@@ -607,14 +624,35 @@ export const TrainingView: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Minimalist Feedback Banner & Dynamic Hint Button */}
-        <div className="w-full max-w-[775px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
-          {feedbackMessage && !sparringGameOverMessage && (
-            <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
+        {/* Floating Badge Overlay & Minimalist Feedback Banner */}
+        <div className="w-full max-w-[775px] mb-3 text-center transition-all duration-300 min-h-[48px] flex flex-col items-center justify-center gap-2 relative">
+          {/* Animated Floating Move Reaction Badge */}
+          {activeBadge && (
+            <div className="animate-bounce transition-all duration-300 transform scale-100 flex items-center justify-center z-20">
+              <div className={`px-4 py-1.5 rounded-full shadow-lg border flex items-center gap-2 font-black text-xs md:text-sm backdrop-blur-md transition-all ${
+                activeBadge.type === 'combo'
+                  ? 'bg-orange-500/20 border-orange-500/50 text-orange-600 dark:text-orange-400 shadow-orange-500/25'
+                  : activeBadge.type === 'key'
+                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-cyan-500/25'
+                  : activeBadge.type === 'mistake'
+                  ? 'bg-red-500/20 border-red-500/50 text-red-500 shadow-red-500/25'
+                  : 'bg-brand-primary/20 border-brand-primary/50 text-brand-primary shadow-brand-primary/25'
+              }`}>
+                <span>{activeBadge.text}</span>
+                {activeBadge.subtext && (
+                  <span className="text-[11px] font-semibold opacity-85 hidden sm:inline">• {activeBadge.subtext}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Standard Feedback Message when no active badge */}
+          {!activeBadge && feedbackMessage && !sparringGameOverMessage && (
+            <span className={`text-xs font-bold flex items-center px-3.5 py-1 rounded-full ${
               boardError
-                ? 'bg-red-500/10 text-red-500'
+                ? 'bg-red-500/10 text-red-500 border border-red-500/20'
                 : isCompleted
-                ? 'bg-green-500/10 text-green-500'
+                ? 'bg-green-500/10 text-green-500 border border-green-500/20'
                 : 'bg-neutral-500/10 text-neutral-500'
             }`}>
               {boardError && <Zap size={12} className="mr-1 animate-pulse" />}
@@ -627,7 +665,7 @@ export const TrainingView: React.FC<Props> = ({
           {!isSparringMode && !isDemoMode && !isCompleted && consecutiveMistakes >= 3 && (
             <button
               onClick={onTriggerHint}
-              className="px-5 py-2.5 rounded-xl bg-brand-primary/15 hover:bg-brand-primary/25 text-brand-primary font-black text-xs md:text-sm uppercase tracking-widest transition-all cursor-pointer animate-bounce border-2 border-brand-primary/45 shadow-md flex items-center gap-2 active:scale-95 duration-200"
+              className="px-5 py-2 rounded-xl bg-brand-primary/15 hover:bg-brand-primary/25 text-brand-primary font-black text-xs md:text-sm uppercase tracking-widest transition-all cursor-pointer animate-bounce border-2 border-brand-primary/45 shadow-md flex items-center gap-2 active:scale-95 duration-200"
               title="Reveal expected move hint (Hotkey: H)"
             >
               <span className="text-sm md:text-base">💡</span>
@@ -636,13 +674,33 @@ export const TrainingView: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Dynamic Progress Bar (during training) */}
+        {/* Dual Progress & Precision HUD (during training) */}
         {!isSparringMode && (
           <div className="w-full max-w-[775px] mb-4 space-y-1.5 animate-fadeIn">
-            <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 dark:text-neutral-400 px-1 tracking-wider">
-              <span>VARIATION PROGRESS</span>
-              <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
+            <div className="flex justify-between items-center px-1 text-[10px] font-bold tracking-wider">
+              <span className="text-neutral-500 dark:text-neutral-400 uppercase">
+                Progreso: {Math.min(currentIndex, currentVariant.moves.length)} / {currentVariant.moves.length} jugadas
+              </span>
+
+              {/* Live Precision Meter */}
+              {!isDemoMode && (
+                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-all ${
+                  precision >= 100
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : precision >= 80
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                    : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                }`}>
+                  <span>Precisión: {precision}%</span>
+                  <div className="flex items-center gap-0.5">
+                    <Star size={11} className={`fill-current ${precision >= 25 ? 'text-amber-400' : 'text-neutral-400'}`} />
+                    <Star size={11} className={`fill-current ${precision >= 80 ? 'text-amber-400' : 'text-neutral-300 dark:text-neutral-600'}`} />
+                    <Star size={11} className={`fill-current ${precision >= 100 ? 'text-amber-400' : 'text-neutral-300 dark:text-neutral-600'}`} />
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-800/80 rounded-full overflow-hidden border border-neutral-300/10 dark:border-neutral-700/10 shadow-inner">
               <div
                 className="h-full bg-gradient-to-r from-brand-primary/60 via-brand-primary to-brand-primary/95 rounded-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(140,106,92,0.3)]"
@@ -770,49 +828,111 @@ export const TrainingView: React.FC<Props> = ({
           />
         )}
 
-        {/* Victory Overlay Panel */}
+        {/* Victory Arcade Performance Card */}
         {isCompleted && !isSparringMode && (
-          <div className="w-full max-w-[775px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-xs">
-            <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
-              <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
-              Excellent! You completed the variation
-            </h4>
-            <p className="text-xs text-green-600 dark:text-green-400/80 mt-1">
-              {isDemoMode 
-                ? 'You completed the demo. Now try it from memory in Practice Mode!' 
-                : 'Perfect recall! Your repetition interval and accuracy have been recorded.'
-              }
+          <div className="w-full max-w-[775px] bg-gradient-to-b from-white to-amber-500/5 dark:from-neutral-900 dark:to-amber-500/5 border-2 border-amber-500/30 rounded-2xl p-6 mt-6 text-center animate-fadeIn shadow-xl relative overflow-hidden">
+            {/* Background celebratory glow */}
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-amber-500/15 blur-2xl pointer-events-none rounded-full" />
+
+            {/* 3 Animated Stars */}
+            <div className="flex items-center justify-center gap-2 mb-3">
+              {[1, 2, 3].map(s => {
+                const earned = s <= (starsEarned || (precision >= 100 ? 3 : precision >= 80 ? 2 : 1));
+                return (
+                  <div
+                    key={s}
+                    className={`transition-all duration-500 transform ${
+                      earned ? 'scale-110' : 'scale-90 opacity-25'
+                    }`}
+                  >
+                    <Star
+                      size={36}
+                      className={`${
+                        earned
+                          ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)] animate-pulse'
+                          : 'text-neutral-400'
+                      }`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Performance Title */}
+            <h3 className="text-lg md:text-xl font-black text-neutral-900 dark:text-neutral-100 flex items-center justify-center gap-2">
+              <Trophy size={20} className="text-amber-500" />
+              <span>
+                {isDemoMode
+                  ? 'Demostración Completada'
+                  : precision >= 100
+                  ? '¡Perfección Absoluta! ⭐⭐⭐'
+                  : precision >= 80
+                  ? '¡Gran Ejecución Teórica! ⭐⭐'
+                  : '¡Variante Conquistada! ⭐'}
+              </span>
+            </h3>
+
+            {/* Subtitle / assessment */}
+            <p className="text-xs md:text-sm text-neutral-600 dark:text-neutral-300 mt-1 max-w-lg mx-auto">
+              {isDemoMode
+                ? 'Has completado la demostración guiada. ¡Ahora ponla a prueba desde la memoria en el Modo Práctica!'
+                : `Completaste la variante con un ${precision}% de precisión teórica en tus movimientos.`}
             </p>
-            <div className="flex flex-wrap gap-2 justify-center mt-3">
+
+            {/* Stats & Rewards Ribbon */}
+            {!isDemoMode && (
+              <div className="flex flex-wrap items-center justify-center gap-2.5 my-4">
+                <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-1.5 shadow-xs">
+                  <Sparkles size={14} className="text-amber-500" />
+                  <span className="text-xs font-black text-amber-700 dark:text-amber-300">
+                    +{lastXpGained || (precision >= 100 ? 125 : precision >= 80 ? 100 : 75)} XP
+                  </span>
+                </div>
+
+                <div className="px-3.5 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  <span>Rango: <strong>{gamificationProfile?.title || 'Peón Curioso'}</strong></span>
+                </div>
+
+                <div className="px-3.5 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  <span>Total Estrellas: <strong>⭐ {gamificationProfile?.totalStars || 0}</strong></span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2.5 justify-center mt-4">
               {/* Sparring CTA */}
               <button
                 onClick={onStartSparring}
-                className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                title="Play out the resulting middlegame against the AI bot"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                title="Jugar la posición resultante contra el bot de IA"
               >
-                <Swords size={13} />
-                <span>Spar vs Bot from here</span>
+                <Swords size={14} />
+                <span>Jugar Sparring vs Bot</span>
               </button>
 
               <button
                 onClick={() => onRestartVariant(false)}
-                className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
               >
-                {isDemoMode ? 'Try Practice Mode' : 'Practice again'}
+                <RotateCcw size={13} />
+                <span>{precision < 100 && !isDemoMode ? 'Reintentar para 3 ⭐' : 'Practicar de nuevo'}</span>
               </button>
+
               {nextVariantInChapter && (
                 <button
                   onClick={() => onStartNextVariant(nextVariantInChapter)}
-                  className="px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white dark:bg-neutral-100 dark:hover:bg-neutral-200 dark:text-neutral-900 font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
                 >
-                  Next Variation
+                  Siguiente Variante →
                 </button>
               )}
+
               <button
                 onClick={onResetToMenu}
-                className="px-3 py-1.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-all cursor-pointer shadow-xs active:scale-95"
               >
-                Back to Menu
+                Volver al Menú
               </button>
             </div>
           </div>

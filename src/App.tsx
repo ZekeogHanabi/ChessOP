@@ -10,7 +10,10 @@ import {
   PieceSetId,
   BlindfoldMode,
   TimerMode,
-  BotDifficulty
+  BotDifficulty,
+  GamificationProfile,
+  MoveFeedbackBadge,
+  StarRating
 } from './types';
 import { parsePgnFile, convertPgnToVariants } from './utils/pgnParser';
 import { soundManager } from './utils/sound';
@@ -25,6 +28,12 @@ import {
   recordDailyActivity,
   getWeakSpots
 } from './utils/analytics';
+import {
+  loadGamificationProfile,
+  calculatePrecision,
+  awardVariantCompletion,
+  createMoveFeedbackBadge
+} from './utils/gamification';
 
 // Modular UI Components
 import { Header } from './components/Header';
@@ -143,6 +152,29 @@ function App() {
   const [sparringFenSnapshot, setSparringFenSnapshot] = useState<string | null>(null);
   const [sparringGameOverMessage, setSparringGameOverMessage] = useState<string | null>(null);
 
+  // --- Gamification & Precision State ---
+  const [gamificationProfile, setGamificationProfile] = useState<GamificationProfile>(() => loadGamificationProfile());
+  const [activeBadge, setActiveBadge] = useState<MoveFeedbackBadge | null>(null);
+  const badgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [currentMistakesThisRun, setCurrentMistakesThisRun] = useState<number>(0);
+  const [userMovesAttemptedThisRun, setUserMovesAttemptedThisRun] = useState<number>(0);
+  const [lastXpGained, setLastXpGained] = useState<number>(0);
+  const [starsEarnedThisRun, setStarsEarnedThisRun] = useState<StarRating | undefined>(undefined);
+
+  const currentPrecision = useMemo(() => {
+    return calculatePrecision(currentMistakesThisRun, userMovesAttemptedThisRun);
+  }, [currentMistakesThisRun, userMovesAttemptedThisRun]);
+
+  const triggerFeedbackBadge = useCallback((badge: MoveFeedbackBadge) => {
+    if (badgeTimeoutRef.current) {
+      clearTimeout(badgeTimeoutRef.current);
+    }
+    setActiveBadge(badge);
+    badgeTimeoutRef.current = setTimeout(() => {
+      setActiveBadge(null);
+    }, 1400);
+  }, []);
+
   // Position evaluation
   const evalScore = useMemo(() => {
     return gameFen ? evaluatePosition(game.current) : { score: 0, label: '0.0', whitePercentage: 50 };
@@ -250,6 +282,11 @@ function App() {
     setOptionSquares({});
     setMaxReachedIndex(0);
     setTimeLeft(maxTime || 10);
+    setCurrentMistakesThisRun(0);
+    setUserMovesAttemptedThisRun(0);
+    setActiveBadge(null);
+    setStarsEarnedThisRun(undefined);
+    setLastXpGained(0);
     setFeedbackMessage(
       shouldStartDemo
         ? 'Demonstration Mode: Follow the arrow to learn the opening line.'
@@ -304,8 +341,14 @@ function App() {
     setBoardError(true);
     setFeedbackMessage('Incorrect move. Try again!');
     setConsecutiveMistakes(prev => prev + 1);
+    setCurrentMistakesThisRun(prev => prev + 1);
     setStreak(0);
     soundManager.playError();
+    triggerFeedbackBadge({
+      type: 'mistake',
+      text: '❌ Imprecisión',
+      subtext: 'No es la jugada del libro'
+    });
 
     // Record weak spot if in practice mode!
     if (currentVariant && !isDemoMode) {
@@ -321,7 +364,7 @@ function App() {
     setTimeout(() => {
       setBoardError(false);
     }, 800);
-  }, [currentVariant, isDemoMode, currentIndex]);
+  }, [currentVariant, isDemoMode, currentIndex, triggerFeedbackBadge]);
 
   // --- Drag & Drop Handler ---
   const handlePieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
@@ -448,18 +491,40 @@ function App() {
         return false;
       }
 
-      playMoveAudioFeedback(game.current, isCapture);
+      setUserMovesAttemptedThisRun(prev => prev + 1);
 
       // Streak increase
-      setStreak(prev => {
-        const next = prev + 1;
-        setBestStreak(b => {
-          const max = Math.max(b, next);
-          localStorage.setItem('chessop_best_streak', String(max));
-          return max;
-        });
-        return next;
+      const nextStreak = streak + 1;
+      setStreak(nextStreak);
+      setBestStreak(b => {
+        const max = Math.max(b, nextStreak);
+        localStorage.setItem('chessop_best_streak', String(max));
+        return max;
       });
+
+      const isKeyMove = !!(
+        actualExpectedMove.comment?.includes('!') ||
+        actualExpectedMove.notation.includes('!') ||
+        ['f4', 'e5', 'Bc4', 'd4'].includes(actualExpectedMove.notation) ||
+        game.current.inCheck()
+      );
+
+      // Arcade synthesized sound feedback
+      if (game.current.inCheck()) {
+        soundManager.playCheck();
+      } else if (isCapture) {
+        soundManager.playCapture();
+      } else if (nextStreak >= 3) {
+        soundManager.playCombo(nextStreak);
+      } else if (isKeyMove) {
+        soundManager.playKeyMove();
+      } else {
+        soundManager.playBookMove();
+      }
+
+      // Energetic floating reaction badge
+      const badge = createMoveFeedbackBadge(actualExpectedMove.notation, isKeyMove, nextStreak);
+      triggerFeedbackBadge(badge);
 
       // Weak spot resolution on correct move & daily activity tracking!
       if (!isDemoMode) {
@@ -706,7 +771,22 @@ function App() {
 
   // --- Handle Successful Training Run ---
   const completeTraining = (variant: OpeningVariant, success: boolean) => {
-    soundManager.playVictory();
+    const finalPrecision = calculatePrecision(currentMistakesThisRun, userMovesAttemptedThisRun);
+    if (!isDemoMode && finalPrecision >= 100) {
+      soundManager.playThreeStars();
+    } else {
+      soundManager.playVictory();
+    }
+
+    const { xpGained, starsAwarded, newProfile } = awardVariantCompletion(
+      variant.id,
+      finalPrecision,
+      isDemoMode,
+      gamificationProfile
+    );
+    setLastXpGained(xpGained);
+    setStarsEarnedThisRun(starsAwarded);
+    setGamificationProfile(newProfile);
 
     // Record daily activity for completed line
     recordDailyActivity(variant.moves.length);
@@ -1253,6 +1333,7 @@ function App() {
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onOpenAnalytics={() => { resetToMenu(); setActiveView('analytics'); }}
         onResetToMenu={resetToMenu}
+        gamificationProfile={gamificationProfile}
       />
 
       {/* CORE VIEWPORT */}
@@ -1308,6 +1389,11 @@ function App() {
             onResetSparringPosition={handleResetSparringPosition}
             onTakebackSparringMove={handleTakebackSparringMove}
             onSetBotDifficulty={setBotDifficulty}
+            precision={currentPrecision}
+            activeBadge={activeBadge}
+            gamificationProfile={gamificationProfile}
+            lastXpGained={lastXpGained}
+            starsEarned={starsEarnedThisRun}
             onPieceDrop={handlePieceDrop}
             onSquareClick={handleSquareClick}
             onNavigateBackward={handleNavigateBackward}
@@ -1333,6 +1419,7 @@ function App() {
             totalSuccesses={totalSuccesses}
             masteredOpenings={masteredOpenings}
             viennaMastered={viennaMastered}
+            gamificationProfile={gamificationProfile}
             onStartVariant={startVariant}
             onOpenViennaDirectory={() => setActiveView('vienna-directory')}
             onStartSrsReview={startSrsReview}
@@ -1383,7 +1470,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.6"
+        version="v1.0.7"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);

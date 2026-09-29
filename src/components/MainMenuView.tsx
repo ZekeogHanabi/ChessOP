@@ -10,9 +10,10 @@ import {
   Brain,
   Trash2,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Star
 } from 'lucide-react';
-import { OpeningVariant, UserProgress } from '../types';
+import { OpeningVariant, UserProgress, GamificationProfile } from '../types';
 
 interface Chapter {
   id: string;
@@ -33,6 +34,7 @@ interface Props {
   totalSuccesses: number;
   masteredOpenings: number;
   viennaMastered: number;
+  gamificationProfile?: GamificationProfile;
   onStartVariant: (variant: OpeningVariant) => void;
   onOpenViennaDirectory: () => void;
   onStartSrsReview: () => void;
@@ -53,6 +55,7 @@ export const MainMenuView: React.FC<Props> = ({
   totalSuccesses,
   masteredOpenings,
   viennaMastered,
+  gamificationProfile,
   onStartVariant,
   onOpenViennaDirectory,
   onStartSrsReview,
@@ -104,21 +107,50 @@ export const MainMenuView: React.FC<Props> = ({
         </div>
 
         {/* Quick Stats Panel */}
-        <div className="grid grid-cols-3 gap-4 md:border-l border-neutral-200 dark:border-neutral-800 md:pl-8 min-w-[280px]">
-          <div className="text-center md:text-left">
-            <span className="block text-xs text-neutral-400 font-medium">Attempts</span>
-            <span className="text-2xl font-bold">{totalAttempts}</span>
-          </div>
-          <div className="text-center md:text-left">
-            <span className="block text-xs text-neutral-400 font-medium">Completed</span>
-            <span className="text-2xl font-bold">{totalSuccesses}</span>
-          </div>
-          <div className="text-center md:text-left">
-            <span className="block text-xs text-neutral-400 font-medium">Mastered</span>
-            <span className="text-2xl font-bold text-brand-primary">{masteredOpenings}</span>
+        <div className="md:border-l border-neutral-200 dark:border-neutral-800 md:pl-8 min-w-[280px] flex flex-col justify-between">
+          {gamificationProfile && (
+            <div className="mb-4 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-black flex items-center justify-center">
+                    {gamificationProfile.level}
+                  </span>
+                  {gamificationProfile.title}
+                </span>
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <Star size={12} className="fill-amber-400 text-amber-400" />
+                  {gamificationProfile.totalStars}
+                </span>
+              </div>
+              <div className="w-full bg-neutral-100 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-brand-primary h-full rounded-full transition-all duration-300"
+                  style={{ width: `${gamificationProfile.currentLevelProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-neutral-400 font-semibold mt-1">
+                <span>{gamificationProfile.totalXp} XP</span>
+                <span>{gamificationProfile.nextLevelXp} XP</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center md:text-left">
+              <span className="block text-xs text-neutral-400 font-medium">Attempts</span>
+              <span className="text-xl font-bold">{totalAttempts}</span>
+            </div>
+            <div className="text-center md:text-left">
+              <span className="block text-xs text-neutral-400 font-medium">Completed</span>
+              <span className="text-xl font-bold">{totalSuccesses}</span>
+            </div>
+            <div className="text-center md:text-left">
+              <span className="block text-xs text-neutral-400 font-medium">Mastered</span>
+              <span className="text-xl font-bold text-brand-primary">{masteredOpenings}</span>
+            </div>
           </div>
 
-          <div className="col-span-3 pt-3 mt-1 border-t border-neutral-100 dark:border-neutral-800">
+          <div className="pt-3 mt-2 border-t border-neutral-100 dark:border-neutral-800">
             <button
               onClick={onOpenAnalytics}
               className="w-full py-2 px-3 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:border-brand-primary/40 dark:hover:border-brand-primary/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 text-xs font-bold text-neutral-600 dark:text-neutral-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
@@ -218,7 +250,19 @@ export const MainMenuView: React.FC<Props> = ({
                       </span>
                     )}
 
-                    {practiceCount > 0 && (
+                    {gamificationProfile?.stars[variant.id] && (
+                      <div className="flex items-center gap-0.5" title={`${gamificationProfile.stars[variant.id]} estrellas`}>
+                        {[1, 2, 3].map(s => (
+                          <Star
+                            key={s}
+                            size={12}
+                            className={s <= gamificationProfile.stars[variant.id] ? 'fill-amber-400 text-amber-400' : 'text-neutral-300 dark:text-neutral-700'}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {practiceCount > 0 && !gamificationProfile?.stars[variant.id] && (
                       <span className="text-brand-primary font-semibold">
                         {practiceCount}x Completed
                       </span>

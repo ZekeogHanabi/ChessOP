@@ -26,6 +26,41 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
       {/* Version List */}
       <div className="space-y-8">
+        {/* Version 1.0.7 */}
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                v1.0.7 • Gamification & Calibrated Precision Engine
+              </span>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Tactical Evaluation Bar, 3-Star Arcade Rating & XP Levels</h3>
+            </div>
+            <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+              Released: September 29, 2026
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+            <p>
+              Version 1.0.7 delivers a major gamified transformation requested by players: opening training is now an addictive, rewarding arcade experience with precise grandmaster-calibrated engine evaluations.
+            </p>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">⭐ What's New in v1.0.7</h4>
+              <ul className="list-disc pl-5 space-y-1.5 text-xs">
+                <li><strong>Calibrated Tactical Evaluation Engine</strong>: Overhauled the offline position evaluator with center control heuristics, pawn space wedges (e.g. <code>e5</code> in Vienna Gambit), development tempo, and open f-file pressure. Gambits now accurately reflect theoretical winning scores (+1.5 to +3.0) instead of naive material deficits.</li>
+                <li><strong>Live Precision Gauge (0% - 100%)</strong>: Real-time accuracy meter on the training HUD that evaluates every move and indicates your live star preview (Emerald 100% ⭐⭐⭐ → Gold 80%+ ⭐⭐ → Amber ⭐).</li>
+                <li><strong>Micro-Animated Floating Badges</strong>: Bouncy, celebratory badges trigger in real time on every move: 📚 <em>Jugada de Libro</em>, 💎 <em>¡Jugada Clave!</em>, 🔥 <em>Combo x3/x5</em>, and ❌ <em>Imprecisión</em>.</li>
+                <li><strong>Arcade Victory Performance Card</strong>: Replaced the plain completion box with an arcade victory screen featuring animated golden stars, XP rewards, rank progression, and instant sparring triggers.</li>
+                <li><strong>Player XP & 8 Progression Ranks</strong>: Level progression from <em>Peón Curioso</em> up to <em>Gran Maestro Legendario</em>, with persistent stars and XP displayed in the header and main menu.</li>
+                <li><strong>Synthesized Arcade Web Audio</strong>: Delightful chimes for book moves, triumphant chords for key moves, escalating combo tones, and a 3-star fanfare.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Version 1.0.6 */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
