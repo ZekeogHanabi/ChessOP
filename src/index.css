@@ -41,3 +41,70 @@ body {
 .dark ::-webkit-scrollbar-thumb {
   background: #444444;
 }
+
+/* 3D Tactile Arcade Button Styles */
+.btn-3d {
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+.btn-3d:active {
+  transform: translateY(6px) !important;
+}
+
+.btn-3d-gold {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 7px 0 #92400e, 0 12px 18px -2px rgba(245, 158, 11, 0.4);
+}
+.btn-3d-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 0 #92400e, 0 16px 22px -2px rgba(245, 158, 11, 0.5);
+}
+.btn-3d-gold:active {
+  box-shadow: 0 1px 0 #92400e, 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.btn-3d-emerald {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 7px 0 #065f46, 0 12px 18px -2px rgba(16, 185, 129, 0.35);
+}
+.btn-3d-emerald:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 0 #065f46, 0 16px 22px -2px rgba(16, 185, 129, 0.45);
+}
+.btn-3d-emerald:active {
+  box-shadow: 0 1px 0 #065f46, 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.btn-3d-slate {
+  background: linear-gradient(180deg, #475569 0%, #334155 100%);
+  box-shadow: 0 7px 0 #1e293b, 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+.btn-3d-slate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 0 #1e293b, 0 14px 18px -3px rgba(0, 0, 0, 0.4);
+}
+.btn-3d-slate:active {
+  box-shadow: 0 1px 0 #1e293b, 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.btn-3d-boss {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
+  box-shadow: 0 9px 0 #450a0a, 0 18px 25px -4px rgba(239, 68, 68, 0.45);
+}
+.btn-3d-boss:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 0 #450a0a, 0 24px 30px -4px rgba(239, 68, 68, 0.55);
+}
+.btn-3d-boss:active {
+  transform: translateY(7px) scale(0.98) !important;
+  box-shadow: 0 2px 0 #450a0a, 0 6px 10px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Keyframe for soft mascot floating */
+@keyframes softFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+.animate-soft-float {
+  animation: softFloat 2.6s ease-in-out infinite;
+}

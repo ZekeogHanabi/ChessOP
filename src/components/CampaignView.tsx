@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   ArrowLeft,
   Trophy,
@@ -11,10 +11,13 @@ import {
   Crown,
   ChevronRight,
   ShieldAlert,
-  Flame
+  Flame,
+  Castle,
+  Shield
 } from 'lucide-react';
 import { CampaignLevel, OpeningVariant, GamificationProfile, UserProgress } from '../types';
 import { CAMPAIGN_WORLDS, findVariantForLevel } from '../utils/campaignData';
+import { soundManager } from '../utils/sound';
 
 interface Props {
   allVariants: OpeningVariant[];
@@ -38,48 +41,94 @@ export const CampaignView: React.FC<Props> = ({
     return CAMPAIGN_WORLDS.find(w => w.id === activeWorldId) || CAMPAIGN_WORLDS[0];
   }, [activeWorldId]);
 
-  // Resolve the opening variant for the selected level
+  // Resolve opening variant for selected level
   const selectedVariant = useMemo(() => {
     if (!selectedLevel) return null;
     return findVariantForLevel(selectedLevel, allVariants);
   }, [selectedLevel, allVariants]);
 
-  // Calculate total stars collected
+  // Total stars collected across all repertoires
   const totalCampaignStars = useMemo(() => {
     return gamificationProfile.totalStars || 0;
   }, [gamificationProfile]);
 
-  // Horizontal offset for winding roadmap (in percentage %)
-  const getNodeXPosition = (index: number, total: number) => {
-    if (index === total - 1) return 50; // The Boss is always centered
-    const pattern = [50, 32, 50, 68, 50, 28, 50, 72];
-    return pattern[index % pattern.length];
+  // Total completed levels in the active world
+  const completedInActiveWorld = useMemo(() => {
+    return activeWorld.levels.filter(lvl => {
+      const v = findVariantForLevel(lvl, allVariants);
+      return v ? (gamificationProfile.stars[v.id] || 0) > 0 : false;
+    }).length;
+  }, [activeWorld, allVariants, gamificationProfile]);
+
+  // World icon helper
+  const getWorldIcon = (worldId: string) => {
+    if (worldId.includes('vienna')) return <Castle size={18} />;
+    if (worldId.includes('asymmetric')) return <Shield size={18} />;
+    return <Swords size={18} />;
   };
 
-  // Generate curved SVG road connecting alternating nodes
-  const pathD = useMemo(() => {
-    const levels = activeWorld.levels;
-    const nodeHeight = 120; // Vertical spacing between nodes in pixels
+  // ----------------------------------------------------
+  // Precise 3D Ribbon Coordinate Geometry
+  // ----------------------------------------------------
+  const nodeHeight = 140;
+  const topPadding = 70;
+  const bottomPadding = 90;
+  const totalHeight = activeWorld.levels.length * nodeHeight + topPadding + bottomPadding;
+
+  const getNodeCoords = useCallback((index: number) => {
+    const isBoss = index === activeWorld.levels.length - 1;
+    if (isBoss) return { x: 200, y: index * nodeHeight + topPadding };
+    // Smooth alternating S-curve pattern centered on X = 200
+    const xPattern = [200, 115, 200, 285, 200, 105, 200, 295];
+    return {
+      x: xPattern[index % xPattern.length],
+      y: index * nodeHeight + topPadding
+    };
+  }, [activeWorld.levels.length]);
+
+  // Full SVG road path
+  const fullPathD = useMemo(() => {
     let d = '';
-
-    levels.forEach((_, i) => {
-      const x = getNodeXPosition(i, levels.length);
-      const y = i * nodeHeight + 40;
-
+    activeWorld.levels.forEach((_, i) => {
+      const { x, y } = getNodeCoords(i);
       if (i === 0) {
         d += `M ${x} ${y}`;
       } else {
-        const prevX = getNodeXPosition(i - 1, levels.length);
-        const prevY = (i - 1) * nodeHeight + 40;
-        const midY = (prevY + y) / 2;
-        d += ` C ${prevX} ${midY}, ${x} ${midY}, ${x} ${y}`;
+        const prev = getNodeCoords(i - 1);
+        const midY = (prev.y + y) / 2;
+        d += ` C ${prev.x} ${midY}, ${x} ${midY}, ${x} ${y}`;
+      }
+    });
+    return d;
+  }, [activeWorld, getNodeCoords]);
+
+  // Illuminated golden flow for completed levels
+  const completedPathD = useMemo(() => {
+    let lastCompletedIdx = -1;
+    activeWorld.levels.forEach((lvl, i) => {
+      const v = findVariantForLevel(lvl, allVariants);
+      if (v && (gamificationProfile.stars[v.id] || 0) > 0) {
+        lastCompletedIdx = i;
       }
     });
 
-    return d;
-  }, [activeWorld]);
+    if (lastCompletedIdx <= 0) return '';
 
-  // Find the first uncompleted level in active world to highlight as "Next Up"
+    let d = '';
+    for (let i = 0; i <= lastCompletedIdx; i++) {
+      const { x, y } = getNodeCoords(i);
+      if (i === 0) {
+        d += `M ${x} ${y}`;
+      } else {
+        const prev = getNodeCoords(i - 1);
+        const midY = (prev.y + y) / 2;
+        d += ` C ${prev.x} ${midY}, ${x} ${midY}, ${x} ${y}`;
+      }
+    }
+    return d;
+  }, [activeWorld, allVariants, gamificationProfile, getNodeCoords]);
+
+  // Find index of recommended next level
   const nextTargetLevelIndex = useMemo(() => {
     const idx = activeWorld.levels.findIndex(lvl => {
       const variant = findVariantForLevel(lvl, allVariants);
@@ -90,103 +139,142 @@ export const CampaignView: React.FC<Props> = ({
     return idx === -1 ? activeWorld.levels.length - 1 : idx;
   }, [activeWorld, allVariants, gamificationProfile]);
 
+  const handleOpenLevelModal = (level: CampaignLevel) => {
+    if (level.isBoss) {
+      soundManager.playKeyMove();
+    } else {
+      soundManager.playBookMove();
+    }
+    setSelectedLevel(level);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-6 animate-fadeIn pb-16">
-      {/* Top Header & Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-xs">
-        <div className="flex items-center gap-3">
+    <div className="max-w-4xl mx-auto w-full space-y-6 animate-fadeIn pb-20 select-none">
+      {/* ==================================================== */}
+      {/* 1. TOP HEADER & PLAYER PROFILE                       */}
+      {/* ==================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
+        <div className="flex items-center gap-3.5">
           <button
             onClick={onBackToMenu}
-            className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+            className="p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-all cursor-pointer shadow-xs active:scale-95"
             title="Back to Main Menu"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} />
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
                 Campaign Mode
               </span>
               <span className="text-xs font-bold text-neutral-400">Roadmap to Mastery</span>
             </div>
-            <h2 className="text-xl md:text-2xl font-black tracking-tight mt-0.5">
-              Opening Campaign Map
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-neutral-900 dark:text-neutral-100 mt-0.5">
+              Adventure Road
             </h2>
           </div>
         </div>
 
         {/* Global Player Campaign Progress Pill */}
-        <div className="flex items-center gap-3 bg-neutral-100 dark:bg-neutral-800/80 px-4 py-2 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 shadow-xs self-start sm:self-auto">
-          <div className="flex items-center gap-1.5">
-            <Trophy size={16} className="text-amber-500" />
-            <span className="text-xs font-black text-neutral-800 dark:text-neutral-200">
-              Lvl. {gamificationProfile.level} • {gamificationProfile.title}
-            </span>
+        <div className="flex items-center gap-3.5 bg-neutral-100 dark:bg-neutral-800/80 px-4 py-2 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 shadow-xs self-start sm:self-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs">
+              <Trophy size={15} />
+            </div>
+            <div>
+              <span className="text-xs font-black text-neutral-800 dark:text-neutral-200 block leading-tight">
+                Lvl. {gamificationProfile.level} • {gamificationProfile.title}
+              </span>
+              <span className="text-[10px] font-bold text-neutral-400">
+                {gamificationProfile.totalXp} XP Total
+              </span>
+            </div>
           </div>
-          <div className="h-4 w-px bg-neutral-300 dark:bg-neutral-700" />
-          <div className="flex items-center gap-1 text-xs font-black text-amber-600 dark:text-amber-400">
-            <Star size={14} className="fill-amber-400 text-amber-400" />
-            <span>{totalCampaignStars} Stars</span>
+
+          <div className="h-5 w-px bg-neutral-300 dark:bg-neutral-700" />
+
+          <div className="flex items-center gap-1.5 text-xs font-black text-amber-600 dark:text-amber-400">
+            <Star size={16} className="fill-amber-400 text-amber-400" />
+            <span>{totalCampaignStars}</span>
           </div>
         </div>
       </div>
 
-      {/* World Selection Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ==================================================== */}
+      {/* 2. WORLD REALM CARDS (SELECTION)                     */}
+      {/* ==================================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         {CAMPAIGN_WORLDS.map(world => {
           const isSelected = world.id === activeWorldId;
-          const completedInWorld = world.levels.filter(lvl => {
+          const completedCount = world.levels.filter(lvl => {
             const variant = findVariantForLevel(lvl, allVariants);
             return variant ? (gamificationProfile.stars[variant.id] || 0) > 0 : false;
           }).length;
+          const pct = Math.round((completedCount / world.levels.length) * 100);
 
           return (
             <button
               key={world.id}
-              onClick={() => setActiveWorldId(world.id)}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden shadow-xs active:scale-[0.99] ${
+              onClick={() => {
+                soundManager.playBookMove();
+                setActiveWorldId(world.id);
+              }}
+              className={`p-4 rounded-3xl border text-left transition-all cursor-pointer relative overflow-hidden shadow-xs active:scale-[0.98] ${
                 isSelected
-                  ? world.theme === 'gold'
-                    ? 'border-amber-500/60 bg-gradient-to-br from-amber-500/15 via-white to-white dark:via-neutral-900 dark:to-neutral-900 shadow-amber-500/10'
-                    : world.theme === 'emerald'
-                    ? 'border-emerald-500/60 bg-gradient-to-br from-emerald-500/15 via-white to-white dark:via-neutral-900 dark:to-neutral-900 shadow-emerald-500/10'
-                    : 'border-blue-500/60 bg-gradient-to-br from-blue-500/15 via-white to-white dark:via-neutral-900 dark:to-neutral-900 shadow-blue-500/10'
+                  ? 'border-amber-500 ring-2 ring-amber-500/30 bg-gradient-to-br from-amber-500/15 via-white to-white dark:via-neutral-900 dark:to-neutral-900 shadow-md'
                   : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700'
               }`}
             >
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-                  World {world.worldNumber}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  completedInWorld === world.levels.length
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className={`p-1.5 rounded-xl ${
+                    isSelected
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
+                  }`}>
+                    {getWorldIcon(world.id)}
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    World {world.worldNumber}
+                  </span>
+                </div>
+
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  completedCount === world.levels.length
                     ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                     : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
                 }`}>
-                  {completedInWorld} / {world.levels.length}
+                  {completedCount}/{world.levels.length}
                 </span>
               </div>
-              <h3 className="text-sm font-black tracking-tight text-neutral-900 dark:text-neutral-100">
+
+              <h3 className="text-sm font-black tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
                 {world.title}
               </h3>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                 {world.subtitle}
               </p>
+
+              {/* Progress bar */}
+              <div className="w-full bg-neutral-100 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-3">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    pct === 100
+                      ? 'bg-emerald-500'
+                      : 'bg-gradient-to-r from-amber-500 to-orange-500'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* World Lore Banner */}
-      <div className={`p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-        activeWorld.theme === 'gold'
-          ? 'bg-amber-500/10 border-amber-500/30'
-          : activeWorld.theme === 'emerald'
-          ? 'bg-emerald-500/10 border-emerald-500/30'
-          : 'bg-blue-500/10 border-blue-500/30'
-      }`}>
+      {/* World Description Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-brand-primary/5 to-transparent border border-amber-500/20 rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
             <Sparkles size={14} />
             <span>World {activeWorld.worldNumber}: {activeWorld.title}</span>
           </div>
@@ -195,53 +283,88 @@ export const CampaignView: React.FC<Props> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-          <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400">
-            {activeWorld.levels.length} Levels • Star Collection ⭐
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
+            {completedInActiveWorld} of {activeWorld.levels.length} Mastered ⭐
           </span>
         </div>
       </div>
 
-      {/* GRAPHICAL WINDING ROAD (SVG PATH + INTERACTIVE NODES) */}
-      <div className="relative bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 sm:p-12 shadow-sm overflow-hidden min-h-[700px]">
-        {/* Subtle decorative background chess grid pattern */}
-        <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none bg-[radial-gradient(#8c6a5c_1px,transparent_1px)] [background-size:16px_16px]" />
+      {/* ==================================================== */}
+      {/* 3. NEO-ARCADE 3D WINDING ROADWAY (FIXED RATIO)      */}
+      {/* ==================================================== */}
+      <div className="relative bg-neutral-50 dark:bg-[#0c0e14] border-2 border-neutral-200 dark:border-neutral-800/80 rounded-3xl p-6 sm:p-10 shadow-lg overflow-hidden flex justify-center">
+        {/* Subtle checkered tiles ambient backdrop */}
+        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.04] pointer-events-none bg-[radial-gradient(#8c6a5c_2px,transparent_2px)] [background-size:24px_24px]" />
 
-        {/* SVG Road connecting nodes */}
-        <svg
-          viewBox={`0 0 100 ${activeWorld.levels.length * 120}`}
-          preserveAspectRatio="none"
-          className="absolute inset-x-0 top-0 w-full h-full pointer-events-none z-0"
-        >
-          {/* Shadow line */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            className="text-neutral-200 dark:text-neutral-800/80"
-          />
-          {/* Active golden dashed road */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeDasharray="4 4"
-            strokeLinecap="round"
-            className="text-amber-500/50 dark:text-amber-400/40"
-          />
-        </svg>
-
-        {/* Nodes Layer */}
+        {/* Constrained Fixed-Ratio Stage Container */}
         <div
-          className="relative z-10 w-full"
-          style={{ height: `${activeWorld.levels.length * 120}px` }}
+          className="relative w-full max-w-[420px]"
+          style={{ height: `${totalHeight}px` }}
         >
+          {/* 3D SVG Highway Layers */}
+          <svg
+            viewBox={`0 0 400 ${totalHeight}`}
+            className="absolute inset-0 w-full h-full pointer-events-none z-0"
+          >
+            <defs>
+              <filter id="road-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            {/* Layer 1: Ground 3D Depth Shadow */}
+            <path
+              d={fullPathD}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="32"
+              strokeLinecap="round"
+              className="text-neutral-300 dark:text-[#06080d]"
+            />
+
+            {/* Layer 2: Main Roadway Pavement */}
+            <path
+              d={fullPathD}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="20"
+              strokeLinecap="round"
+              className="text-neutral-200 dark:text-neutral-800"
+            />
+
+            {/* Layer 3: Dashed Road Guide */}
+            <path
+              d={fullPathD}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeDasharray="6 6"
+              strokeLinecap="round"
+              className="text-neutral-400/50 dark:text-neutral-600/50"
+            />
+
+            {/* Layer 4: Illuminated Golden Progress Flow */}
+            {completedPathD && (
+              <path
+                d={completedPathD}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="6"
+                strokeDasharray="12 8"
+                strokeLinecap="round"
+                filter="url(#road-glow)"
+                className="opacity-90"
+              />
+            )}
+          </svg>
+
+          {/* Interactive 3D Nodes */}
           {activeWorld.levels.map((level, i) => {
-            const xPercent = getNodeXPosition(i, activeWorld.levels.length);
-            const yPixels = i * 120 + 40;
+            const coords = getNodeCoords(i);
+            const xPercent = (coords.x / 400) * 100;
+            const yPixels = coords.y;
             const variant = findVariantForLevel(level, allVariants);
             const stars = variant ? gamificationProfile.stars[variant.id] || 0 : 0;
             const isCompleted = stars > 0;
@@ -251,70 +374,76 @@ export const CampaignView: React.FC<Props> = ({
             return (
               <div
                 key={level.id}
-                className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group"
+                className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-10"
                 style={{
                   left: `${xPercent}%`,
                   top: `${yPixels}px`
                 }}
               >
-                {/* Floating "Next Up!" Badge */}
+                {/* 1. Animated Floating Mascot Speech Bubble (Next Challenge) */}
                 {isNextTarget && (
-                  <div className="absolute -top-7 animate-bounce whitespace-nowrap z-20">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-brand-primary text-white shadow-md flex items-center gap-1 uppercase tracking-wider">
-                      <Flame size={10} className="fill-white" /> Next Up!
-                    </span>
+                  <div className="absolute -top-13 z-30 animate-soft-float flex flex-col items-center pointer-events-none whitespace-nowrap">
+                    <div className="px-3 py-1 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 shadow-xl flex items-center gap-1.5 uppercase tracking-wider border border-amber-200">
+                      <Flame size={12} className="fill-slate-950" /> Next Challenge!
+                    </div>
+                    <div className="w-2.5 h-2.5 bg-orange-500 rotate-45 -mt-1 shadow-md" />
                   </div>
                 )}
 
-                {/* Stars Badge on top of completed node */}
-                {isCompleted && (
-                  <div className="absolute -top-3.5 z-20 flex items-center gap-0.5 bg-neutral-900/90 dark:bg-black/90 px-1.5 py-0.5 rounded-full border border-amber-500/40 shadow-xs">
+                {/* 2. Floating Star Pedestal (Completed Levels) */}
+                {isCompleted && !isBoss && (
+                  <div className="absolute -top-4 z-20 flex items-center gap-0.5 bg-slate-950 dark:bg-black px-2.5 py-0.5 rounded-full border border-amber-400/80 shadow-lg">
                     {[1, 2, 3].map(s => (
                       <Star
                         key={s}
-                        size={10}
-                        className={s <= stars ? 'fill-amber-400 text-amber-400' : 'text-neutral-600'}
+                        size={11}
+                        className={s <= stars ? 'fill-amber-400 text-amber-400 drop-shadow-xs' : 'text-neutral-600'}
                       />
                     ))}
                   </div>
                 )}
 
-                {/* Interactive Node Button */}
+                {/* 3. Boss Crown Badge */}
+                {isBoss && (
+                  <div className="absolute -top-4 z-20 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-950 text-red-300 border border-red-500 shadow-xl flex items-center gap-1">
+                    <Swords size={12} /> Boss Duel
+                  </div>
+                )}
+
+                {/* 4. Tangible 3D Arcade Button */}
                 <button
-                  onClick={() => setSelectedLevel(level)}
-                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all duration-300 transform active:scale-95 cursor-pointer shadow-lg relative ${
+                  onClick={() => handleOpenLevelModal(level)}
+                  className={`btn-3d flex items-center justify-center cursor-pointer relative ${
                     isBoss
-                      ? 'w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-amber-600 to-red-600 text-white border-4 border-amber-400 shadow-amber-500/30'
+                      ? 'w-22 h-22 sm:w-24 sm:h-24 rounded-3xl btn-3d-boss border-4 border-amber-300 text-white'
                       : isCompleted
-                      ? stars === 3
-                        ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white border-2 border-amber-300 shadow-amber-500/25'
-                        : 'bg-emerald-600 text-white border-2 border-emerald-400 shadow-emerald-600/20'
+                      ? 'w-16 h-16 sm:w-18 sm:h-18 rounded-3xl btn-3d-emerald border-2 border-emerald-300 text-white'
                       : isNextTarget
-                      ? 'bg-brand-primary text-white border-4 border-brand-primary/50 ring-4 ring-brand-primary/30 animate-pulse shadow-brand-primary/30'
-                      : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-2 border-neutral-300 dark:border-neutral-700 hover:border-brand-primary/50'
+                      ? 'w-18 h-18 sm:w-20 sm:h-20 rounded-3xl btn-3d-gold border-4 border-amber-200 text-slate-950 ring-4 ring-amber-400/30'
+                      : 'w-16 h-16 sm:w-18 sm:h-18 rounded-3xl btn-3d-slate border-2 border-slate-600 text-slate-200'
                   }`}
-                  title={`${level.title} • Click to view details`}
+                  title={`${level.title} • Click to view`}
                 >
                   {isBoss ? (
-                    <Crown size={28} className="fill-white animate-pulse" />
+                    <Crown size={36} className="fill-amber-300 text-amber-300 filter drop-shadow-md animate-pulse" />
                   ) : isCompleted ? (
-                    <CheckCircle2 size={24} className="stroke-[2.5]" />
+                    <CheckCircle2 size={30} className="stroke-[2.5]" />
                   ) : (
-                    <span className="font-black text-sm sm:text-base font-mono">
+                    <span className="font-mono font-black text-xl">
                       {level.levelNumber}
                     </span>
                   )}
                 </button>
 
-                {/* Level Title label under node */}
+                {/* 5. Level Label Tag Under Node */}
                 <div
-                  onClick={() => setSelectedLevel(level)}
-                  className="mt-2 text-center cursor-pointer max-w-[130px]"
+                  onClick={() => handleOpenLevelModal(level)}
+                  className="mt-3 text-center cursor-pointer max-w-[140px] px-2.5 py-1.5 rounded-2xl bg-white/80 dark:bg-neutral-900/90 backdrop-blur-xs border border-neutral-200/80 dark:border-neutral-800 shadow-xs hover:border-brand-primary/50 transition-all group-hover:scale-105"
                 >
-                  <span className="block text-[11px] font-black text-neutral-800 dark:text-neutral-200 truncate leading-tight group-hover:text-brand-primary transition-colors">
+                  <span className="block text-[11px] font-black text-neutral-900 dark:text-neutral-100 truncate leading-tight">
                     {level.title}
                   </span>
-                  <span className="text-[10px] text-neutral-400 font-semibold block truncate">
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-semibold block truncate mt-0.5">
                     {level.subtitle}
                   </span>
                 </div>
@@ -324,91 +453,98 @@ export const CampaignView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* LEVEL DETAILS DIALOG / ACTION MODAL */}
+      {/* ==================================================== */}
+      {/* 4. LEVEL DETAILS MODAL DIALOG                        */}
+      {/* ==================================================== */}
       {selectedLevel && selectedVariant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-scaleUp relative">
-            {/* Header with Level Badge */}
-            <div className="flex justify-between items-start">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 animate-scaleUp relative overflow-hidden">
+            {/* Ambient accent background glow */}
+            <div className={`absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none blur-3xl opacity-20 ${
+              selectedLevel.isBoss ? 'bg-red-500' : 'bg-amber-500'
+            }`} />
+
+            {/* Header info */}
+            <div className="flex justify-between items-start relative z-10">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
                     Level {selectedLevel.levelNumber} • {selectedVariant.side === 'white' ? 'White' : 'Black'}
                   </span>
                   {selectedLevel.isBoss && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20 flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/15 text-red-500 border border-red-500/30 flex items-center gap-1">
                       <ShieldAlert size={12} /> Boss Fight
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl font-black tracking-tight mt-1.5 text-neutral-900 dark:text-neutral-100">
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight mt-1.5 text-neutral-900 dark:text-neutral-100">
                   {selectedLevel.title}
                 </h3>
-                <span className="text-xs text-neutral-400 font-semibold block">
+                <span className="text-xs text-neutral-400 font-semibold block mt-0.5">
                   {selectedLevel.subtitle}
                 </span>
               </div>
 
-              {/* Current Stars Pill */}
-              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
+              {/* Stars Earned Pill */}
+              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-2xl border border-neutral-200 dark:border-neutral-700">
                 {[1, 2, 3].map(s => {
                   const earned = s <= (gamificationProfile.stars[selectedVariant.id] || 0);
                   return (
                     <Star
                       key={s}
-                      size={15}
-                      className={earned ? 'fill-amber-400 text-amber-400' : 'text-neutral-300 dark:text-neutral-600'}
+                      size={16}
+                      className={earned ? 'fill-amber-400 text-amber-400 drop-shadow-xs' : 'text-neutral-300 dark:text-neutral-600'}
                     />
                   );
                 })}
               </div>
             </div>
 
-            {/* Description & Objective */}
-            <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 space-y-2 border border-neutral-100 dark:border-neutral-800 text-xs">
+            {/* Theoretical Objective Box */}
+            <div className="bg-neutral-50 dark:bg-neutral-800/60 rounded-2xl p-4.5 space-y-1.5 border border-neutral-200/60 dark:border-neutral-800 text-xs relative z-10">
               <span className="font-bold text-neutral-400 uppercase tracking-wider text-[10px] block">
                 Theoretical Objective
               </span>
-              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium text-xs sm:text-sm">
                 {selectedLevel.description}
               </p>
             </div>
 
-            {/* Stats & Rewards Ribbon */}
-            <div className="grid grid-cols-3 gap-2.5 text-xs">
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-between">
+            {/* Stats Ribbon */}
+            <div className="grid grid-cols-3 gap-3 text-xs relative z-10">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-between">
                 <span className="font-bold text-neutral-400 text-[10px] uppercase">Reward:</span>
-                <span className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
-                  <Sparkles size={12} /> +125 XP
+                <span className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1 text-sm">
+                  <Sparkles size={14} /> +125 XP
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
+              <div className="p-3.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
                 <span className="font-bold text-neutral-400 text-[10px] uppercase">Line Depth:</span>
-                <span className="font-black text-neutral-800 dark:text-neutral-200 mt-0.5">
+                <span className="font-black text-neutral-800 dark:text-neutral-200 mt-1 text-sm">
                   {selectedVariant.moves.length} moves
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
+              <div className="p-3.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
                 <span className="font-bold text-neutral-400 text-[10px] uppercase">Mastered:</span>
-                <span className="font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                <span className="font-black text-emerald-600 dark:text-emerald-400 mt-1 text-sm">
                   {userProgress[selectedVariant.id]?.successes || 0}x times
                 </span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2 relative z-10">
               {selectedLevel.isBoss ? (
                 <button
                   onClick={() => {
                     onStartCampaignLevel(selectedVariant, false, true);
                     setSelectedLevel(null);
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs md:text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  className="flex-1 py-3.5 px-5 rounded-2xl btn-3d-boss text-white font-black text-sm tracking-wide shadow-lg flex items-center justify-center gap-2 cursor-pointer border border-amber-400"
                 >
-                  <Swords size={16} />
+                  <Swords size={18} />
                   <span>Challenge Boss (AI Sparring Duel)!</span>
                 </button>
               ) : (
@@ -418,9 +554,9 @@ export const CampaignView: React.FC<Props> = ({
                       onStartCampaignLevel(selectedVariant, true, false);
                       setSelectedLevel(null);
                     }}
-                    className="py-2.5 px-4 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-3 px-4 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                   >
-                    <BookOpen size={14} />
+                    <BookOpen size={15} />
                     <span>Watch Demo</span>
                   </button>
 
@@ -429,18 +565,18 @@ export const CampaignView: React.FC<Props> = ({
                       onStartCampaignLevel(selectedVariant, false, false);
                       setSelectedLevel(null);
                     }}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-white font-black text-xs md:text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    className="flex-1 py-3.5 px-5 rounded-2xl btn-3d-gold text-slate-950 font-black text-sm tracking-wide shadow-md flex items-center justify-center gap-1.5 cursor-pointer border border-amber-200"
                   >
-                    <Play size={15} className="fill-white" />
+                    <Play size={16} className="fill-slate-950" />
                     <span>Play Level (Practice)!</span>
-                    <ChevronRight size={14} />
+                    <ChevronRight size={16} />
                   </button>
                 </>
               )}
 
               <button
                 onClick={() => setSelectedLevel(null)}
-                className="py-2.5 px-4 rounded-xl text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
+                className="py-3 px-4 rounded-2xl text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 font-bold text-xs transition-colors cursor-pointer text-center"
               >
                 Close
               </button>
