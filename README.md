@@ -1,104 +1,121 @@
-# ♟️ ChessOp - Chess Opening Trainer
+# ChessOp
 
-An **open-source**, **ultra-lightweight** (low resource consumption) web application designed with a **minimalist, timeless aesthetic**. Built for chess players looking to memorize and perfect their opening repertoires through active recall and muscle memory.
+Fast, client-side chess opening repertoire trainer built with React, TypeScript, and Tailwind CSS.
 
-Designed entirely as a static single-page application, ready to be deployed for free and immediately on **Cloudflare Pages** (or GitHub Pages, Vercel, Netlify).
+[![Version](https://img.shields.io/badge/version-1.0.8-blue.svg)](package.json)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
----
-
-## ✨ Key Features
-
-1. **Minimalist & Timeless Aesthetic**: Inspired by *Chessreps*, *Lichess*, and clean interfaces like *Substack* or *Linear*. Features a curated palette of warm earth, soft sepia, and carbon tones. No aggressive neon lights or heavy futuristic animations.
-2. **Low Resource Consumption**:
-   - All state, progress metrics, and repertoires are evaluated and saved locally in the browser using `localStorage`.
-   - Zero servers, zero databases, zero heavy API calls.
-   - 100% performance on Google Lighthouse.
-3. **Optimized Training Loop**:
-   - **Demonstration Mode**: Guides the user by dynamically drawing translucent helper arrows on the board showing the expected move. Once completed, the system registers the line as introduced.
-   - **Practice Mode**: Challenges the user to play the theoretical lines entirely from memory. In case of an incorrect or non-theoretical move, the board immediately triggers subtle visual feedback (soft red flash and lateral vibration) and reverts the move, allowing you to try again.
-4. **Auto-Opponent Responses**: When you execute a correct theoretical move, after a natural delay of 400ms, the machine automatically plays the pre-configured opponent response.
-5. **Educational Strategic Comments**: Every move in a variation contains strategic annotations and educational commentary, explaining the *why* behind every position.
-6. **Adaptive Theme**: Toggle easily between a soft warm sepia light mode and a deep carbon dark mode.
+ChessOp is an offline-capable web application designed to help chess players memorize and master opening lines through active recall, spaced repetition, and post-theory AI sparring. It runs entirely in the browser with zero backend requirements—all progress, analytics, and custom repertoires persist in `localStorage`.
 
 ---
 
-## 🛠️ Technology Stack
+## Features
 
-- **Core**: React 18 + TypeScript + Vite.
-- **Styling**: Tailwind CSS v3 (highly optimized and production-ready).
-- **Chess Logic**: `chess.js` (for full move validation and rule compliance).
-- **Graphical Board**: `react-chessboard` v5 (utilizing the new unified options API, ultra-responsive and fast).
-- **Icon Set**: `lucide-react`.
-
----
-
-## 📂 Data Structure (TypeScript)
-
-Repertoire variations are modeled linearly in `src/types.ts`:
-
-```typescript
-export interface MoveNode {
-  from: string;      // Source square, e.g., "e2"
-  to: string;        // Target square, e.g., "e4"
-  notation: string;  // Algebraic notation, e.g., "e4"
-  comment?: string;  // Educational comment explaining the move
-}
-
-export interface OpeningVariant {
-  id: string;
-  name: string;        // Variation name
-  openingName: string; // Main opening name
-  description: string; // Repertoire context/strategy explanation
-  side: 'white' | 'black'; // The side played by the user
-  moves: MoveNode[];   // Ordered list of repertoire moves
-}
-```
+- **Active Recall Training**: Practice opening lines from memory with instant move feedback, book move annotations, and guided demonstration mode.
+- **Campaign Mode**: Interactive winding roadmap connecting variations into themed worlds (Vienna Gambit, Asymmetric Defenses, Open Classics) with end-of-world Boss Battles.
+- **Post-Theory AI Sparring**: In-browser Minimax bot with Alpha-Beta pruning to test whether you can convert theoretical advantages into full game wins across 3 skill levels (~1200, ~1600, ~2000+ ELO).
+- **Spaced Repetition System (SRS)**: Adaptive review scheduling based on the SM-2 algorithm to prioritize lines that need reinforcement.
+- **Learning Diagnostics**: Automatic tracking of theoretical weak spots (Achilles' Heel) by move coordinates and a 15-week activity consistency heatmap.
+- **Calibrated Tactical Evaluation**: Real-time evaluation bar calibrated for opening gambits, center control heuristics, development tempo, and king safety.
+- **Custom PGN Support**: Import opening repertoires and studies directly from Lichess or Chess.com, with one-click JSON backup export and restore.
+- **Customization**: Multiple board color palettes, SVG piece sets (Classic, Wood, Neo, Glass), optional blindfold mode, and synthesized Web Audio sound effects.
 
 ---
 
-## 🚀 Deployment to Cloudflare Pages (Free & Instant!)
+## Tech Stack
 
-As ChessOp compiles entirely down to static assets, deploying to **Cloudflare Pages** is incredibly straightforward through GitHub:
-
-1. Create a repository on your **GitHub** account and upload the code.
-2. Log into your **Cloudflare** dashboard.
-3. Go to **Workers & Pages** -> **Create application** -> **Pages** tab -> **Connect to Git**.
-4. Select your newly created repository.
-5. In the build settings, select the **Vite** preset:
-   - **Framework Preset**: `Vite`
-   - **Build Command**: `npm run build`
-   - **Build Output Directory**: `dist`
-6. Click **Save and Deploy**. Your site will be online in seconds on a subdomain like `https://your-project.pages.dev/` with free SSL and global CDN.
+| Layer | Technology |
+| --- | --- |
+| **Framework** | [React 18](https://react.dev/) + [Vite](https://vitejs.dev/) |
+| **Language** | [TypeScript](https://www.typescriptlang.org/) |
+| **Styling** | [Tailwind CSS](https://tailwindcss.com/) |
+| **Chess Rules** | [chess.js](https://github.com/jhlywa/chess.js) |
+| **Board UI** | [react-chessboard](https://github.com/Clariity/react-chessboard) |
+| **Bot Engine** | Minimax with Alpha-Beta Pruning + PST evaluation (custom in-browser) |
+| **Audio** | Web Audio API (procedural synthesized chimes and chords) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
 
 ---
 
-## 💻 Local Development
+## Getting Started
 
-To modify the openings database, add your own repertoires, or tweak styling:
+### Prerequisites
 
-1. **Clone the repository**:
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- `npm` or `pnpm`
+
+### Installation
+
+1. Clone the repository:
    ```bash
-   git clone <REPOSITORY_URL>
-   cd ChessOp
+   git clone https://github.com/ZekeogHanabi/ChessOP.git
+   cd ChessOP
    ```
 
-2. **Install dependencies**:
+2. Install dependencies:
    ```bash
-   npm install --legacy-peer-deps
+   npm install
    ```
 
-3. **Start the development server**:
+3. Start the local development server:
    ```bash
    npm run dev
    ```
 
-4. **Build for production**:
+4. Build for production:
    ```bash
    npm run build
    ```
 
 ---
 
-## 📜 License
+## Project Structure
 
-This project is open-source and released under the **MIT License**. Feel free to fork it, adapt it to your own opening repertoire, and play! 🚀
+```
+ChessOP/
+├── public/
+│   ├── vienna.pgn          # Default master repertoire study
+│   └── vite.svg
+├── src/
+│   ├── components/         # Views (Main Menu, Training, Campaign, Analytics, Changelog, Modals)
+│   ├── data/               # Default opening variations data
+│   ├── utils/
+│   │   ├── analytics.ts    # Weak spots tracking and daily activity logs
+│   │   ├── campaignData.ts # Worlds, levels, and boss battle definitions
+│   │   ├── chessBot.ts     # Minimax sparring engine with alpha-beta pruning
+│   │   ├── evaluator.ts    # Tactical position heuristic evaluation bar
+│   │   ├── gamification.ts # XP levels, ranks, 3-star ratings, and precision engine
+│   │   ├── pgnParser.ts    # PGN file and study parser
+│   │   ├── pieceSets.ts    # SVG piece set rendering
+│   │   ├── sound.ts        # Synthesized Web Audio sound manager
+│   │   └── srs.ts          # Spaced repetition scheduling (SM-2)
+│   ├── types.ts            # Domain TypeScript models
+│   ├── App.tsx             # Root application orchestrator
+│   └── main.tsx            # React entrypoint
+├── package.json
+├── tailwind.config.js
+└── vite.config.ts
+```
+
+---
+
+## Deployment
+
+Because ChessOp builds to pure static HTML/JS/CSS assets, it can be deployed on any static hosting provider.
+
+### Cloudflare Pages
+
+1. Link your GitHub repository in the Cloudflare dashboard under **Workers & Pages**.
+2. Set the build configuration:
+   - **Framework preset**: `Vite`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+3. Deploy.
+
+The same settings apply to Vercel, Netlify, or GitHub Pages.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
