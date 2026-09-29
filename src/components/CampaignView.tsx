@@ -18,6 +18,7 @@ import {
 import { CampaignLevel, OpeningVariant, GamificationProfile, UserProgress } from '../types';
 import { CAMPAIGN_WORLDS, findVariantForLevel } from '../utils/campaignData';
 import { soundManager } from '../utils/sound';
+import { haptics } from '../utils/haptics';
 
 interface Props {
   allVariants: OpeningVariant[];
@@ -140,6 +141,7 @@ export const CampaignView: React.FC<Props> = ({
   }, [activeWorld, allVariants, gamificationProfile]);
 
   const handleOpenLevelModal = (level: CampaignLevel) => {
+    haptics.lightTap();
     if (level.isBoss) {
       soundManager.playKeyMove();
     } else {

@@ -17,6 +17,7 @@ import {
 } from './types';
 import { parsePgnFile, convertPgnToVariants } from './utils/pgnParser';
 import { soundManager } from './utils/sound';
+import { haptics } from './utils/haptics';
 import { calculateNextSrsProgress, getDueVariants } from './utils/srs';
 import { BOARD_THEMES } from './utils/boardThemes';
 import { evaluatePosition } from './utils/evaluator';
@@ -243,14 +244,17 @@ function App() {
     setSoundEnabled(next);
   };
 
-  // --- Sound Dispatcher Helper ---
+  // --- Sound & Haptics Dispatcher Helper ---
   const playMoveAudioFeedback = (chessInstance: Chess, isCaptureMove: boolean) => {
     if (chessInstance.inCheck()) {
       soundManager.playCheck();
+      haptics.check();
     } else if (isCaptureMove) {
       soundManager.playCapture();
+      haptics.capture();
     } else {
       soundManager.playMove();
+      haptics.lightTap();
     }
   };
 
@@ -345,6 +349,7 @@ function App() {
     setCurrentMistakesThisRun(prev => prev + 1);
     setStreak(0);
     soundManager.playError();
+    haptics.error();
     triggerFeedbackBadge({
       type: 'mistake',
       text: '❌ Inaccuracy',
@@ -775,8 +780,10 @@ function App() {
     const finalPrecision = calculatePrecision(currentMistakesThisRun, userMovesAttemptedThisRun);
     if (!isDemoMode && finalPrecision >= 100) {
       soundManager.playThreeStars();
+      haptics.success();
     } else {
       soundManager.playVictory();
+      haptics.success();
     }
 
     const { xpGained, starsAwarded, newProfile } = awardVariantCompletion(
