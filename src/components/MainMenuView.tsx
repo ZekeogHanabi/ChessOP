@@ -11,7 +11,8 @@ import {
   Trash2,
   Sparkles,
   BarChart3,
-  Star
+  Star,
+  Map
 } from 'lucide-react';
 import { OpeningVariant, UserProgress, GamificationProfile } from '../types';
 
@@ -39,6 +40,7 @@ interface Props {
   onOpenViennaDirectory: () => void;
   onStartSrsReview: () => void;
   onOpenAnalytics: () => void;
+  onOpenCampaign?: () => void;
   onDeleteCustomRepertoire: (openingName: string) => void;
   onExportProgress: () => void;
   onImportProgress: (jsonString: string) => void;
@@ -60,6 +62,7 @@ export const MainMenuView: React.FC<Props> = ({
   onOpenViennaDirectory,
   onStartSrsReview,
   onOpenAnalytics,
+  onOpenCampaign,
   onDeleteCustomRepertoire,
   onExportProgress,
   onImportProgress,
@@ -161,6 +164,43 @@ export const MainMenuView: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Interactive Campaign Levels Banner */}
+      {onOpenCampaign && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-brand-primary/10 to-transparent border-2 border-amber-500/30 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-5 shadow-sm relative overflow-hidden animate-fadeIn">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -mr-8 -mt-8 pointer-events-none blur-xl" />
+          
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-xs border border-amber-500/30">
+              <Map size={24} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                  Nuevo • Modo Aventura
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                  Ruta Gráfica
+                </span>
+              </div>
+              <h3 className="text-lg md:text-xl font-black tracking-tight text-neutral-900 dark:text-neutral-100 mt-0.5">
+                Ruta de Niveles de Aperturas
+              </h3>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-xl mt-1">
+                Avanza casilla a casilla por el camino sinuoso, conquista las 3 estrellas en cada variante teórica y derrota a los Jefes de Sparring.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenCampaign}
+            className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-brand-primary hover:from-amber-500 hover:to-brand-primary/95 text-white font-black text-xs md:text-sm tracking-wide shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 shrink-0 self-start md:self-auto"
+          >
+            <Play size={14} className="fill-white" />
+            <span>Explorar Ruta de Niveles</span>
+          </button>
+        </div>
+      )}
 
       {/* SRS Due Review Card */}
       {dueVariants.length > 0 && (

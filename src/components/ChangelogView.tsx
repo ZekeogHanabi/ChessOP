@@ -26,6 +26,46 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
       {/* Version List */}
       <div className="space-y-8">
+        {/* Version 1.0.8 */}
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                v1.0.8 • Modo Campaña: Mapa Gráfico de Niveles & Batallas de Boss
+              </span>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Ruta de Niveles Tipo Aventura, Mundos Temáticos y Boss Sparring</h3>
+            </div>
+            <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+              Released: September 29, 2026
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+            <p>
+              La versión 1.0.8 introduce el <strong>Modo Campaña (Ruta de Aventuras)</strong>: una experiencia visual de progresión inspirada en los mapas de caminos de Duolingo y Candy Crush, donde dominar aperturas se convierte en una expedición de conquista con estrellas, mundos temáticos y batallas épicas contra jefes.
+            </p>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🗺️ Novedades de la Versión 1.0.8</h4>
+              <ul className="list-disc pl-5 space-y-1.5 text-xs">
+                <li><strong>Mapa Gráfico Serpenteante</strong>: Ruta curva visual con nodos alternados flotantes, estrellas conseguidas en tiempo real (⭐/⭐⭐/⭐⭐⭐), avatar pulsante animado en tu próximo desafío recomendado e iluminación de camino completado.</li>
+                <li><strong>3 Mundos Temáticos Iniciales</strong>:
+                  <ul className="list-circle pl-4 mt-1 space-y-1 text-neutral-500 dark:text-neutral-400">
+                    <li><em>Mundo 1: Reino del Gambito Vienés</em> (8 variantes de teoría agresiva + Jefe Final Vienés).</li>
+                    <li><em>Mundo 2: Las Murallas Negras</em> (Siciliana Najdorf, Francesa Winawer, Caro-Kann + Boss Táctico Asimétrico).</li>
+                    <li><em>Mundo 3: Los Clásicos Abiertos</em> (Ruy López Berlín, Fanchetto & Fegatello + Boss de Final Posicional).</li>
+                  </ul>
+                </li>
+                <li><strong>Nodos de Jefe Final (Boss Sparring Fights)</strong>: Nodos especiales coronados con espadas cruzadas que transportan la posición teórica final directamente al motor de Sparring contra el Bot para probar si puedes convertir la ventaja en una victoria real.</li>
+                <li><strong>Modal Interactivo de Detalle de Nivel</strong>: Muestra los objetivos teóricos, dificultad, XP en juego, estadísticas personales y accesos directos rápidos para Demostración paso a paso, Práctica guiada o Duelo Sparring.</li>
+                <li><strong>Integración en Todo el Ecosistema</strong>: Acceso instantáneo a la Campaña desde el nuevo botón "Mapa" en el Header, el banner destacado de Aventura en el Menú Principal, y un botón de avance directo en la Tarjeta de Victoria al finalizar una variante.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Version 1.0.7 */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-12 -mt-12 pointer-events-none" />

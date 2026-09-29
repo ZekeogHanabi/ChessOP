@@ -9,7 +9,8 @@ import {
   Keyboard,
   Layers,
   BarChart3,
-  Star
+  Star,
+  Map
 } from 'lucide-react';
 import { GamificationProfile } from '../types';
 
@@ -23,6 +24,7 @@ interface Props {
   onOpenImportModal: () => void;
   onOpenShortcutsModal: () => void;
   onOpenAnalytics: () => void;
+  onOpenCampaign?: () => void;
   onResetToMenu: () => void;
   gamificationProfile?: GamificationProfile;
 }
@@ -37,6 +39,7 @@ export const Header: React.FC<Props> = ({
   onOpenImportModal,
   onOpenShortcutsModal,
   onOpenAnalytics,
+  onOpenCampaign,
   onResetToMenu,
   gamificationProfile
 }) => {
@@ -59,9 +62,9 @@ export const Header: React.FC<Props> = ({
       {/* Player Gamification Level & XP Progress Pill */}
       {gamificationProfile && (
         <div
-          onClick={onOpenAnalytics}
+          onClick={onOpenCampaign || onOpenAnalytics}
           className="hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700/80 cursor-pointer hover:border-brand-primary/40 transition-all shadow-xs group"
-          title={`Nivel ${gamificationProfile.level}: ${gamificationProfile.title} (${gamificationProfile.totalXp} XP)`}
+          title={`Nivel ${gamificationProfile.level}: ${gamificationProfile.title} (${gamificationProfile.totalXp} XP) • Clic para ver Mapa de Niveles`}
         >
           <div className="flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-black text-[11px] flex items-center justify-center">
@@ -93,6 +96,18 @@ export const Header: React.FC<Props> = ({
 
       {/* Toolbar actions */}
       <div className="flex items-center space-x-1.5 md:space-x-2">
+        {/* Campaign Map / Levels */}
+        {onOpenCampaign && (
+          <button
+            onClick={onOpenCampaign}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+            title="Mapa de Niveles / Modo Campaña"
+            aria-label="Mapa de Niveles"
+          >
+            <Map size={17} />
+          </button>
+        )}
+
         {/* Learning Analytics & Weak Spots */}
         <button
           onClick={onOpenAnalytics}

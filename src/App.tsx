@@ -44,6 +44,7 @@ import { ViennaDirectory } from './components/ViennaDirectory';
 import { TrainingView } from './components/TrainingView';
 import { ChangelogView } from './components/ChangelogView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { CampaignView } from './components/CampaignView';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { BoardThemeSelectorModal } from './components/BoardThemeSelectorModal';
 import { ImportPgnModal } from './components/ImportPgnModal';
@@ -901,6 +902,42 @@ function App() {
     setActiveView('menu');
   }, []);
 
+  const openCampaign = useCallback(() => {
+    setCurrentVariant(null);
+    setIsCompleted(false);
+    setPlaylistMode('none');
+    setActiveView('campaign');
+  }, []);
+
+  const handleStartCampaignLevel = useCallback((variant: OpeningVariant, isDemo: boolean, isBossSparring?: boolean) => {
+    if (isBossSparring) {
+      const chessInstance = new Chess();
+      for (const m of variant.moves) {
+        try {
+          chessInstance.move({ from: m.from, to: m.to, promotion: 'q' });
+        } catch {
+          // failsafe
+        }
+      }
+      game.current = chessInstance;
+      setCurrentVariant(variant);
+      setGameFen(chessInstance.fen());
+      setCurrentIndex(variant.moves.length);
+      setMaxReachedIndex(variant.moves.length);
+      setIsDemoMode(false);
+      setIsCompleted(false);
+      setIsSparringMode(true);
+      setBotDifficulty('intermediate');
+      setSparringFenSnapshot(chessInstance.fen());
+      setSparringGameOverMessage(null);
+      setIsBotThinking(false);
+      setFeedbackMessage('⚔️ ¡Duelo de Jefe contra la IA activado! Juega la posición resultante.');
+      soundManager.playKeyMove();
+    } else {
+      startVariant(variant, isDemo);
+    }
+  }, [startVariant]);
+
   // --- Sparring Control Handlers ---
   const handleStartSparring = useCallback(() => {
     if (!currentVariant) return;
@@ -1332,6 +1369,7 @@ function App() {
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onOpenAnalytics={() => { resetToMenu(); setActiveView('analytics'); }}
+        onOpenCampaign={openCampaign}
         onResetToMenu={resetToMenu}
         gamificationProfile={gamificationProfile}
       />
@@ -1407,6 +1445,7 @@ function App() {
             onResetToMenu={resetToMenu}
             onStartNextVariant={(variant) => startVariant(variant, isDemoMode)}
             onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+            onOpenCampaign={openCampaign}
           />
         ) : activeView === 'menu' ? (
           <MainMenuView
@@ -1424,6 +1463,7 @@ function App() {
             onOpenViennaDirectory={() => setActiveView('vienna-directory')}
             onStartSrsReview={startSrsReview}
             onOpenAnalytics={() => setActiveView('analytics')}
+            onOpenCampaign={openCampaign}
             onDeleteCustomRepertoire={handleDeleteCustomRepertoire}
             onExportProgress={handleExportProgress}
             onImportProgress={handleImportProgress}
@@ -1460,6 +1500,14 @@ function App() {
             onDrillWeakSpots={startDrillWeakSpots}
             onStartVariant={startVariant}
           />
+        ) : activeView === 'campaign' ? (
+          <CampaignView
+            allVariants={variants}
+            userProgress={userProgress}
+            gamificationProfile={gamificationProfile}
+            onBackToMenu={() => setActiveView('menu')}
+            onStartCampaignLevel={handleStartCampaignLevel}
+          />
         ) : (
           <ChangelogView onBackToMenu={() => setActiveView('menu')} />
         )}
@@ -1470,7 +1518,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.7"
+        version="v1.0.8"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);

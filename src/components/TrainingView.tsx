@@ -24,7 +24,8 @@ import {
   ChevronUp,
   Eye,
   Star,
-  Trophy
+  Trophy,
+  Map
 } from 'lucide-react';
 import {
   OpeningVariant,
@@ -105,6 +106,7 @@ interface Props {
   onResetToMenu: () => void;
   onStartNextVariant: (variant: OpeningVariant) => void;
   onOpenShortcutsModal: () => void;
+  onOpenCampaign?: () => void;
 }
 
 export const TrainingView: React.FC<Props> = ({
@@ -167,7 +169,8 @@ export const TrainingView: React.FC<Props> = ({
   onSwitchMode,
   onResetToMenu,
   onStartNextVariant,
-  onOpenShortcutsModal
+  onOpenShortcutsModal,
+  onOpenCampaign
 }) => {
   // Right-click Tactical Annotations (Circles and Highlights)
   const [rightClickedSquares, setRightClickedSquares] = useState<Record<string, React.CSSProperties>>({});
@@ -925,6 +928,16 @@ export const TrainingView: React.FC<Props> = ({
                   className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white dark:bg-neutral-100 dark:hover:bg-neutral-200 dark:text-neutral-900 font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
                 >
                   Siguiente Variante →
+                </button>
+              )}
+
+              {onOpenCampaign && (
+                <button
+                  onClick={onOpenCampaign}
+                  className="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Map size={13} />
+                  <span>Ver en el Mapa de Niveles</span>
                 </button>
               )}
 

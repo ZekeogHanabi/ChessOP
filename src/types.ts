@@ -64,8 +64,29 @@ export interface PositionEvaluation {
   isMate?: boolean;
 }
 
-export type AppView = 'menu' | 'vienna-directory' | 'changelog' | 'analytics';
+export type AppView = 'menu' | 'vienna-directory' | 'changelog' | 'analytics' | 'campaign';
 export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs' | 'weakspots';
+
+export interface CampaignLevel {
+  id: string;
+  levelNumber: number;
+  title: string;
+  subtitle: string;
+  variantId: string;
+  isBoss?: boolean;
+  bossDifficulty?: BotDifficulty;
+  description: string;
+}
+
+export interface CampaignWorld {
+  id: string;
+  worldNumber: number;
+  title: string;
+  subtitle: string;
+  description: string;
+  theme: 'gold' | 'emerald' | 'sapphire';
+  levels: CampaignLevel[];
+}
 
 export type BotDifficulty = 'casual' | 'intermediate' | 'master';
 
