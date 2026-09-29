@@ -30,6 +30,20 @@ export interface UserProgress {
   nextReviewDate?: string; // ISO date string when review is due
 }
 
+export interface WeakSpotRecord {
+  variantId: string;
+  plyIndex: number;
+  expectedMove: string;
+  mistakeCount: number;
+  lastFailed: string;
+}
+
+export interface HeatmapDay {
+  date: string; // YYYY-MM-DD
+  count: number;
+  level: 0 | 1 | 2 | 3 | 4; // Visual intensity
+}
+
 export type BoardThemeId = 'sepia' | 'wood' | 'green' | 'blue';
 
 export interface BoardThemeConfig {
@@ -50,5 +64,5 @@ export interface PositionEvaluation {
   isMate?: boolean;
 }
 
-export type AppView = 'menu' | 'vienna-directory' | 'changelog';
-export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs';
+export type AppView = 'menu' | 'vienna-directory' | 'changelog' | 'analytics';
+export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs' | 'weakspots';

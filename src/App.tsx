@@ -17,6 +17,12 @@ import { calculateNextSrsProgress, getDueVariants } from './utils/srs';
 import { BOARD_THEMES } from './utils/boardThemes';
 import { evaluatePosition } from './utils/evaluator';
 import { getCustomPieces } from './utils/pieceSets';
+import {
+  recordWeakSpot,
+  resolveWeakSpot,
+  recordDailyActivity,
+  getWeakSpots
+} from './utils/analytics';
 
 // Modular UI Components
 import { Header } from './components/Header';
@@ -26,6 +32,7 @@ import { MainMenuView } from './components/MainMenuView';
 import { ViennaDirectory } from './components/ViennaDirectory';
 import { TrainingView } from './components/TrainingView';
 import { ChangelogView } from './components/ChangelogView';
+import { AnalyticsView } from './components/AnalyticsView';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { BoardThemeSelectorModal } from './components/BoardThemeSelectorModal';
 import { ImportPgnModal } from './components/ImportPgnModal';
@@ -136,6 +143,12 @@ function App() {
   const customPieces = useMemo(() => {
     return getCustomPieces(pieceSetId, blindfoldMode, currentVariant?.side || 'white');
   }, [pieceSetId, blindfoldMode, currentVariant?.side]);
+
+  // Weak spots list (re-evaluates when opening analytics or when variants change)
+  const weakSpots = useMemo(() => {
+    if (activeView !== 'analytics') return [];
+    return getWeakSpots(variants);
+  }, [variants, activeView]);
 
   // --- Load Dynamic PGN on Startup ---
   useEffect(() => {
@@ -274,6 +287,30 @@ function App() {
   };
   makeRivalMoveRef.current = makeRivalMove;
 
+  // --- Visual & Acoustic Error Feedback ---
+  const triggerErrorFeedback = useCallback(() => {
+    setBoardError(true);
+    setFeedbackMessage('Incorrect move. Try again!');
+    setConsecutiveMistakes(prev => prev + 1);
+    setStreak(0);
+    soundManager.playError();
+
+    // Record weak spot if in practice mode!
+    if (currentVariant && !isDemoMode) {
+      const expected = currentVariant.moves[currentIndex];
+      if (expected) {
+        recordWeakSpot(currentVariant.id, currentIndex, expected.notation);
+      }
+    }
+    
+    setSelectedSquare(null);
+    setOptionSquares({});
+    
+    setTimeout(() => {
+      setBoardError(false);
+    }, 800);
+  }, [currentVariant, isDemoMode, currentIndex]);
+
   // --- Drag & Drop Handler ---
   const handlePieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
     if (!currentVariant || isCompleted || boardError) return false;
@@ -340,6 +377,12 @@ function App() {
         });
         return next;
       });
+
+      // Weak spot resolution on correct move & daily activity tracking!
+      if (!isDemoMode) {
+        resolveWeakSpot(actualVariant.id, currentIndex);
+        recordDailyActivity(1);
+      }
 
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
@@ -484,22 +527,6 @@ function App() {
     }
   }, [currentVariant, currentIndex, maxReachedIndex, boardError]);
 
-  // --- Visual & Acoustic Error Feedback ---
-  const triggerErrorFeedback = useCallback(() => {
-    setBoardError(true);
-    setFeedbackMessage('Incorrect move. Try again!');
-    setConsecutiveMistakes(prev => prev + 1);
-    setStreak(0);
-    soundManager.playError();
-    
-    setSelectedSquare(null);
-    setOptionSquares({});
-    
-    setTimeout(() => {
-      setBoardError(false);
-    }, 800);
-  }, []);
-
   // --- Trigger Move Hint ---
   const triggerHint = useCallback(() => {
     if (!currentVariant || isCompleted) return;
@@ -546,6 +573,9 @@ function App() {
   const completeTraining = (variant: OpeningVariant, success: boolean) => {
     soundManager.playVictory();
 
+    // Record daily activity for completed line
+    recordDailyActivity(variant.moves.length);
+
     const currentProg = userProgress[variant.id] || {
       variantId: variant.id,
       attempts: 0,
@@ -591,6 +621,8 @@ function App() {
           ? `Rumble line conquered! Loading next chapter: ${nextVar.chapterName}...`
           : playlistMode === 'srs'
           ? `Memory review passed! Next due variation loading...`
+          : playlistMode === 'weakspots'
+          ? `Weak spot drilled! Loading next target line...`
           : `Main line completed! Loading next main study line: ${nextVar.chapterName}...`;
         
         setFeedbackMessage(transitionText);
@@ -604,6 +636,8 @@ function App() {
           ? 'Rumble Challenge Conquered! Mastered a line from all 11 principal chapters!'
           : playlistMode === 'srs'
           ? 'Daily Spaced Repetition Review Complete! Your memory is razor-sharp!'
+          : playlistMode === 'weakspots'
+          ? 'Weak Spots Overcome! You hammered your stumbling points into muscle memory!'
           : 'Study Repertoire Mastered! Completed the Main Lines of all 11 principal chapters!';
         setFeedbackMessage(victoryText);
         setPlaylistMode('none');
@@ -847,6 +881,15 @@ function App() {
     startVariant(dueVariants[0], false);
   };
 
+  const startDrillWeakSpots = (variantsToDrill: OpeningVariant[]) => {
+    if (variantsToDrill.length === 0) return;
+    setPlaylistMode('weakspots');
+    setPlaylistQueue(variantsToDrill);
+    setPlaylistOriginalSize(variantsToDrill.length);
+    setPlaylistIndex(0);
+    startVariant(variantsToDrill[0], false);
+  };
+
   const toggleChapterExpand = (chapterId: string) => {
     setExpandedChapters(prev => ({
       ...prev,
@@ -881,7 +924,7 @@ function App() {
       pieceSetId,
       bestStreak,
       exportedAt: new Date().toISOString(),
-      version: '1.0.3'
+      version: '1.0.4'
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -921,6 +964,8 @@ function App() {
       setBestStreak(0);
       localStorage.removeItem('chessop_progress');
       localStorage.removeItem('chessop_best_streak');
+      localStorage.removeItem('chessop_weak_spots');
+      localStorage.removeItem('chessop_activity_log');
     }
   };
 
@@ -951,6 +996,10 @@ function App() {
         }
         if (currentVariant) {
           resetToMenu();
+          return;
+        }
+        if (activeView !== 'menu') {
+          setActiveView('menu');
           return;
         }
       }
@@ -991,6 +1040,7 @@ function App() {
     isPieceModalOpen,
     isImportModalOpen,
     isShortcutsModalOpen,
+    activeView,
     handleNavigateBackward,
     handleNavigateForward,
     startVariant,
@@ -1010,6 +1060,7 @@ function App() {
         onOpenPieceModal={() => setIsPieceModalOpen(true)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+        onOpenAnalytics={() => { resetToMenu(); setActiveView('analytics'); }}
         onResetToMenu={resetToMenu}
       />
 
@@ -1085,6 +1136,7 @@ function App() {
             onStartVariant={startVariant}
             onOpenViennaDirectory={() => setActiveView('vienna-directory')}
             onStartSrsReview={startSrsReview}
+            onOpenAnalytics={() => setActiveView('analytics')}
             onDeleteCustomRepertoire={handleDeleteCustomRepertoire}
             onExportProgress={handleExportProgress}
             onImportProgress={handleImportProgress}
@@ -1112,6 +1164,15 @@ function App() {
               total: viennaVariants.length
             }}
           />
+        ) : activeView === 'analytics' ? (
+          <AnalyticsView
+            variants={variants}
+            userProgress={userProgress}
+            weakSpots={weakSpots}
+            onBackToMenu={() => setActiveView('menu')}
+            onDrillWeakSpots={startDrillWeakSpots}
+            onStartVariant={startVariant}
+          />
         ) : (
           <ChangelogView onBackToMenu={() => setActiveView('menu')} />
         )}
@@ -1122,7 +1183,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.3"
+        version="v1.0.4"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);

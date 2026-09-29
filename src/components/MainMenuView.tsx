@@ -9,7 +9,8 @@ import {
   UploadCloud,
   Brain,
   Trash2,
-  Sparkles
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 import { OpeningVariant, UserProgress } from '../types';
 
@@ -35,6 +36,7 @@ interface Props {
   onStartVariant: (variant: OpeningVariant) => void;
   onOpenViennaDirectory: () => void;
   onStartSrsReview: () => void;
+  onOpenAnalytics: () => void;
   onDeleteCustomRepertoire: (openingName: string) => void;
   onExportProgress: () => void;
   onImportProgress: (jsonString: string) => void;
@@ -54,6 +56,7 @@ export const MainMenuView: React.FC<Props> = ({
   onStartVariant,
   onOpenViennaDirectory,
   onStartSrsReview,
+  onOpenAnalytics,
   onDeleteCustomRepertoire,
   onExportProgress,
   onImportProgress,
@@ -113,6 +116,16 @@ export const MainMenuView: React.FC<Props> = ({
           <div className="text-center md:text-left">
             <span className="block text-xs text-neutral-400 font-medium">Mastered</span>
             <span className="text-2xl font-bold text-brand-primary">{masteredOpenings}</span>
+          </div>
+
+          <div className="col-span-3 pt-3 mt-1 border-t border-neutral-100 dark:border-neutral-800">
+            <button
+              onClick={onOpenAnalytics}
+              className="w-full py-2 px-3 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:border-brand-primary/40 dark:hover:border-brand-primary/40 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 text-xs font-bold text-neutral-600 dark:text-neutral-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
+            >
+              <BarChart3 size={13} className="text-brand-primary" />
+              <span>View Learning Analytics & Weak Spots</span>
+            </button>
           </div>
         </div>
       </div>

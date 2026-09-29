@@ -7,7 +7,8 @@ import {
   Palette,
   Upload,
   Keyboard,
-  Layers
+  Layers,
+  BarChart3
 } from 'lucide-react';
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   onOpenPieceModal: () => void;
   onOpenImportModal: () => void;
   onOpenShortcutsModal: () => void;
+  onOpenAnalytics: () => void;
   onResetToMenu: () => void;
 }
 
@@ -31,6 +33,7 @@ export const Header: React.FC<Props> = ({
   onOpenPieceModal,
   onOpenImportModal,
   onOpenShortcutsModal,
+  onOpenAnalytics,
   onResetToMenu
 }) => {
   return (
@@ -51,6 +54,16 @@ export const Header: React.FC<Props> = ({
 
       {/* Toolbar actions */}
       <div className="flex items-center space-x-1.5 md:space-x-2">
+        {/* Learning Analytics & Weak Spots */}
+        <button
+          onClick={onOpenAnalytics}
+          className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+          title="Learning Analytics & Weak Spots"
+          aria-label="Learning Analytics"
+        >
+          <BarChart3 size={17} />
+        </button>
+
         {/* Sound Toggle */}
         <button
           onClick={onToggleSound}

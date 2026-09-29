@@ -26,6 +26,53 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
       {/* Version List */}
       <div className="space-y-8">
+        {/* Version 1.0.4 */}
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                v1.0.4 • Analytics & Weak Spots
+              </span>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Learning Dashboard, Heatmap & Stumble Driller</h3>
+            </div>
+            <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+              Released: September 29, 2026
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+            <p>
+              Version 1.0.4 introduces a high-fidelity <strong>Learning Dashboard</strong> to track your memory progress, visualize training consistency with activity heatmaps, and automatically diagnose theoretical stumbling points.
+            </p>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🎯 Weak Spots Detector (Talón de Aquiles)</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Automatic Coordinate Tracking</strong>: Records the exact move number and square coordinates whenever mistakes occur in Practice Mode.</li>
+                <li><strong>One-Click Drill Playlist</strong>: Click "Drill My Weak Spots" to launch an intense, targeted practice session focused specifically on resolving your most recurring gaps.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">📅 Training Consistency Heatmap</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>15-Week Activity Grid</strong>: GitHub-style commit calendar visualizing your daily training frequency and volume.</li>
+                <li><strong>Daily Streak Counters</strong>: Displays your active training day streak and all-time personal consistency record.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">📊 Repertoire Mastery Breakdown</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Individual Repertoire Metrics</strong>: Independent mastery progress bars and clean run accuracy for Vienna Game, default defenses, and custom PGN imports.</li>
+                <li><strong>Theory Plies Stored</strong>: Live KPI counting the exact total number of theoretical half-moves solidified into muscle memory.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Version 1.0.3 */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
