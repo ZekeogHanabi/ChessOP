@@ -100,25 +100,15 @@ const getTableValue = (type: string, squareIndex: number, isWhite: boolean): num
 };
 
 /**
- * Evaluates the board position from White's perspective.
+ * Raw evaluation in centipawns (from White's perspective)
  */
-export const evaluatePosition = (game: Chess): PositionEvaluation => {
+export const evaluatePositionRawCentipawns = (game: Chess): number => {
   if (game.isCheckmate()) {
-    const isWhiteTurn = game.turn() === 'w';
-    return {
-      score: isWhiteTurn ? -100 : 100,
-      label: isWhiteTurn ? '#-0' : '#+0',
-      whitePercentage: isWhiteTurn ? 0 : 100,
-      isMate: true
-    };
+    return game.turn() === 'w' ? -99999 : 99999;
   }
 
   if (game.isDraw()) {
-    return {
-      score: 0,
-      label: '0.0',
-      whitePercentage: 50
-    };
+    return 0;
   }
 
   const board = game.board();
@@ -140,6 +130,33 @@ export const evaluatePosition = (game: Chess): PositionEvaluation => {
       }
     }
   }
+
+  return centipawns;
+};
+
+/**
+ * Evaluates the board position from White's perspective.
+ */
+export const evaluatePosition = (game: Chess): PositionEvaluation => {
+  if (game.isCheckmate()) {
+    const isWhiteTurn = game.turn() === 'w';
+    return {
+      score: isWhiteTurn ? -100 : 100,
+      label: isWhiteTurn ? '#-0' : '#+0',
+      whitePercentage: isWhiteTurn ? 0 : 100,
+      isMate: true
+    };
+  }
+
+  if (game.isDraw()) {
+    return {
+      score: 0,
+      label: '0.0',
+      whitePercentage: 50
+    };
+  }
+
+  const centipawns = evaluatePositionRawCentipawns(game);
 
   // Convert centipawns to pawns
   const scoreInPawns = centipawns / 100;

@@ -12,10 +12,12 @@ export const KeyboardShortcutsModal: React.FC<Props> = ({ isOpen, onClose }) => 
   const shortcuts = [
     { key: '←', desc: 'Step backward (Undo move in variation)' },
     { key: '→', desc: 'Step forward (Redo move)' },
-    { key: 'Space', desc: 'Restart current variation' },
+    { key: 'Space', desc: 'Restart variation / Reset sparring FEN' },
+    { key: 'U', desc: 'Takeback move in Sparring Mode' },
     { key: 'H', desc: 'Get move hint (draws guide arrow)' },
     { key: 'M', desc: 'Toggle sound effects on / off' },
-    { key: 'Esc', desc: 'Return to main menu or close modal' }
+    { key: 'R-Click', desc: 'Circle square / Drag to draw arrows' },
+    { key: 'Esc', desc: 'Return to main menu or exit sparring' }
   ];
 
   return (

@@ -9,7 +9,8 @@ import {
   BoardThemeId,
   PieceSetId,
   BlindfoldMode,
-  TimerMode
+  TimerMode,
+  BotDifficulty
 } from './types';
 import { parsePgnFile, convertPgnToVariants } from './utils/pgnParser';
 import { soundManager } from './utils/sound';
@@ -17,6 +18,7 @@ import { calculateNextSrsProgress, getDueVariants } from './utils/srs';
 import { BOARD_THEMES } from './utils/boardThemes';
 import { evaluatePosition } from './utils/evaluator';
 import { getCustomPieces } from './utils/pieceSets';
+import { findBotMove } from './utils/chessBot';
 import {
   recordWeakSpot,
   resolveWeakSpot,
@@ -134,6 +136,13 @@ function App() {
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
   const [maxReachedIndex, setMaxReachedIndex] = useState<number>(0);
 
+  // --- Post-Theory Sparring Mode State ---
+  const [isSparringMode, setIsSparringMode] = useState<boolean>(false);
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>('intermediate');
+  const [isBotThinking, setIsBotThinking] = useState<boolean>(false);
+  const [sparringFenSnapshot, setSparringFenSnapshot] = useState<string | null>(null);
+  const [sparringGameOverMessage, setSparringGameOverMessage] = useState<string | null>(null);
+
   // Position evaluation
   const evalScore = useMemo(() => {
     return gameFen ? evaluatePosition(game.current) : { score: 0, label: '0.0', whitePercentage: 50 };
@@ -231,6 +240,9 @@ function App() {
     setCurrentIndex(0);
     setIsDemoMode(shouldStartDemo);
     setIsCompleted(false);
+    setIsSparringMode(false);
+    setSparringGameOverMessage(null);
+    setIsBotThinking(false);
     setBoardError(false);
     setConsecutiveMistakes(0);
     setShowHintArrow(false);
@@ -313,7 +325,78 @@ function App() {
 
   // --- Drag & Drop Handler ---
   const handlePieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
-    if (!currentVariant || isCompleted || boardError) return false;
+    if (!currentVariant) return false;
+
+    // --- Post-Theory Sparring Mode ---
+    if (isSparringMode) {
+      if (isBotThinking || sparringGameOverMessage) return false;
+
+      const isUserTurn = currentVariant.side === 'white'
+        ? game.current.turn() === 'w'
+        : game.current.turn() === 'b';
+
+      if (!isUserTurn) return false;
+
+      try {
+        const isCapture = !!game.current.get(targetSquare as Square);
+        const move = game.current.move({
+          from: sourceSquare,
+          to: targetSquare,
+          promotion: 'q'
+        });
+
+        if (!move) {
+          soundManager.playError();
+          return false;
+        }
+
+        playMoveAudioFeedback(game.current, isCapture);
+        setGameFen(game.current.fen());
+        setSelectedSquare(null);
+        setOptionSquares({});
+
+        if (game.current.isCheckmate()) {
+          soundManager.playVictory();
+          setSparringGameOverMessage('Checkmate! You won against the Bot! 🏆');
+          return true;
+        }
+        if (game.current.isDraw()) {
+          setSparringGameOverMessage('Game drawn (stalemate, repetition, or 50-move rule).');
+          return true;
+        }
+
+        // Trigger Bot calculation
+        setIsBotThinking(true);
+        setFeedbackMessage('Bot is calculating response...');
+
+        setTimeout(() => {
+          const botMove = findBotMove(game.current, botDifficulty);
+          if (botMove) {
+            const isBotCapture = !!game.current.get(botMove.to as Square);
+            game.current.move(botMove);
+            playMoveAudioFeedback(game.current, isBotCapture);
+            setGameFen(game.current.fen());
+
+            if (game.current.isCheckmate()) {
+              soundManager.playError();
+              setSparringGameOverMessage('Checkmate! Bot won the game.');
+            } else if (game.current.isDraw()) {
+              setSparringGameOverMessage('Game drawn (stalemate, repetition, or 50-move rule).');
+            } else {
+              setFeedbackMessage('Your turn!');
+            }
+          }
+          setIsBotThinking(false);
+        }, 450);
+
+        return true;
+      } catch (err) {
+        console.error('Sparring move error:', err);
+        return false;
+      }
+    }
+
+    if (isCompleted || boardError) return false;
 
     const expectedMove = currentVariant.moves[currentIndex];
     if (!expectedMove) return false;
@@ -415,7 +498,59 @@ function App() {
 
   // --- Click to Move and Highlights Handler ---
   const handleSquareClick = (square: string) => {
-    if (!currentVariant || isCompleted || boardError) return;
+    if (!currentVariant) return;
+
+    if (isSparringMode) {
+      if (isBotThinking || sparringGameOverMessage) return;
+
+      const isUserTurn = currentVariant.side === 'white'
+        ? game.current.turn() === 'w'
+        : game.current.turn() === 'b';
+
+      if (!isUserTurn) return;
+
+      if (selectedSquare) {
+        if (selectedSquare === square) {
+          setSelectedSquare(null);
+          setOptionSquares({});
+          return;
+        }
+
+        const success = handlePieceDrop(selectedSquare, square);
+        if (success) {
+          setSelectedSquare(null);
+          setOptionSquares({});
+          return;
+        }
+      }
+
+      const piece = game.current.get(square as Square);
+      const expectedColor = currentVariant.side === 'white' ? 'w' : 'b';
+
+      if (piece && piece.color === expectedColor) {
+        setSelectedSquare(square);
+        const rawMoves = game.current.moves({ square: square as Square, verbose: true });
+        const highlightSquares: Record<string, React.CSSProperties> = {};
+        
+        rawMoves.forEach((m: Move) => {
+          const targetPiece = game.current.get(m.to);
+          highlightSquares[m.to] = {
+            background: targetPiece
+              ? 'radial-gradient(circle, transparent 50%, rgba(140, 106, 92, 0.45) 56%)'
+              : 'radial-gradient(circle, rgba(140, 106, 92, 0.4) 20%, transparent 25%)',
+            borderRadius: '50%'
+          };
+        });
+
+        setOptionSquares(highlightSquares);
+      } else {
+        setSelectedSquare(null);
+        setOptionSquares({});
+      }
+      return;
+    }
+
+    if (isCompleted || boardError) return;
 
     const isUserTurn = currentVariant.side === 'white'
       ? currentIndex % 2 === 0
@@ -673,6 +808,9 @@ function App() {
   const resetToMenu = useCallback(() => {
     setCurrentVariant(null);
     setIsCompleted(false);
+    setIsSparringMode(false);
+    setSparringGameOverMessage(null);
+    setIsBotThinking(false);
     setLastMoveComment(null);
     setFeedbackMessage(null);
     setPlaylistMode('none');
@@ -682,6 +820,46 @@ function App() {
     setStreak(0);
     setActiveView('menu');
   }, []);
+
+  // --- Sparring Control Handlers ---
+  const handleStartSparring = useCallback(() => {
+    if (!currentVariant) return;
+    setIsSparringMode(true);
+    const currentFen = game.current.fen();
+    setSparringFenSnapshot(currentFen);
+    setSparringGameOverMessage(null);
+    setIsBotThinking(false);
+    setFeedbackMessage(`Sparring vs Bot (${botDifficulty}) started! Make any legal move.`);
+  }, [currentVariant, botDifficulty]);
+
+  const handleExitSparring = useCallback(() => {
+    setIsSparringMode(false);
+    setSparringGameOverMessage(null);
+    setIsBotThinking(false);
+    if (currentVariant) {
+      startVariant(currentVariant, isDemoMode);
+    }
+  }, [currentVariant, isDemoMode, startVariant]);
+
+  const handleResetSparringPosition = useCallback(() => {
+    if (!sparringFenSnapshot) return;
+    game.current.load(sparringFenSnapshot);
+    setGameFen(sparringFenSnapshot);
+    setSparringGameOverMessage(null);
+    setIsBotThinking(false);
+    setFeedbackMessage('Position reset to start of sparring.');
+  }, [sparringFenSnapshot]);
+
+  const handleTakebackSparringMove = useCallback(() => {
+    if (!isSparringMode || isBotThinking) return;
+    const undo1 = game.current.undo();
+    if (undo1) {
+      game.current.undo();
+    }
+    setGameFen(game.current.fen());
+    setSparringGameOverMessage(null);
+    setFeedbackMessage('Move taken back.');
+  }, [isSparringMode, isBotThinking]);
 
   // --- Demonstration Guide Arrow ---
   const getDemoArrows = (): string[][] | undefined => {
@@ -924,7 +1102,7 @@ function App() {
       pieceSetId,
       bestStreak,
       exportedAt: new Date().toISOString(),
-      version: '1.0.4'
+      version: '1.0.5'
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -994,6 +1172,10 @@ function App() {
           setIsShortcutsModalOpen(false);
           return;
         }
+        if (isSparringMode) {
+          handleExitSparring();
+          return;
+        }
         if (currentVariant) {
           resetToMenu();
           return;
@@ -1011,6 +1193,17 @@ function App() {
 
       if (e.key === '?') {
         setIsShortcutsModalOpen(true);
+        return;
+      }
+
+      if (isSparringMode) {
+        if (e.key === ' ') {
+          e.preventDefault();
+          handleResetSparringPosition();
+        } else if (e.key === 'u' || e.key === 'U' || (e.ctrlKey && e.key === 'z')) {
+          e.preventDefault();
+          handleTakebackSparringMove();
+        }
         return;
       }
 
@@ -1036,6 +1229,7 @@ function App() {
   }, [
     currentVariant,
     isDemoMode,
+    isSparringMode,
     isThemeModalOpen,
     isPieceModalOpen,
     isImportModalOpen,
@@ -1045,7 +1239,10 @@ function App() {
     handleNavigateForward,
     startVariant,
     triggerHint,
-    resetToMenu
+    resetToMenu,
+    handleExitSparring,
+    handleResetSparringPosition,
+    handleTakebackSparringMove
   ]);
 
   return (
@@ -1108,6 +1305,15 @@ function App() {
             userProgress={userProgress}
             onSelectBranch={(branch) => startVariant(branch, isDemoMode)}
             onOpenPieceModal={() => setIsPieceModalOpen(true)}
+            isSparringMode={isSparringMode}
+            botDifficulty={botDifficulty}
+            isBotThinking={isBotThinking}
+            sparringGameOverMessage={sparringGameOverMessage}
+            onStartSparring={handleStartSparring}
+            onExitSparring={handleExitSparring}
+            onResetSparringPosition={handleResetSparringPosition}
+            onTakebackSparringMove={handleTakebackSparringMove}
+            onSetBotDifficulty={setBotDifficulty}
             onPieceDrop={handlePieceDrop}
             onSquareClick={handleSquareClick}
             onNavigateBackward={handleNavigateBackward}
@@ -1183,7 +1389,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.4"
+        version="v1.0.5"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);

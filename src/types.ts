@@ -66,3 +66,17 @@ export interface PositionEvaluation {
 
 export type AppView = 'menu' | 'vienna-directory' | 'changelog' | 'analytics';
 export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs' | 'weakspots';
+
+export type BotDifficulty = 'casual' | 'intermediate' | 'master';
+
+export type BoardArrow = [string, string, string?];
+
+export interface StrategicPlan {
+  title: string;
+  keyIdea: string;
+  pawnBreaks: string[];
+  pieceGoals: string[];
+  tacticalThemes: string[];
+  recommendedArrows: BoardArrow[];
+}
+

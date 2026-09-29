@@ -26,6 +26,55 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
       {/* Version List */}
       <div className="space-y-8">
+        {/* Version 1.0.5 */}
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                v1.0.5 • Tactical Board & Sparring Bot
+              </span>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Post-Theory AI Sparring, Strategic Plans & Board Annotations</h3>
+            </div>
+            <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
+              Released: September 29, 2026
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
+            <p>
+              Version 1.0.5 bridges theoretical memorization with live over-the-board play. You can now transition directly from mastering an opening variation into free sparring against an intelligent offline AI engine, draw tactical arrows on the board, and explore grandmaster strategic plans.
+            </p>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🤖 Post-Theory Sparring Bot (Jugar vs Bot)</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>In-Browser Minimax Engine</strong>: Built with Alpha-Beta pruning, MVV-LVA move ordering, and PST evaluations that run 100% offline.</li>
+                <li><strong>3 Calibrated Skill Levels</strong>: Casual (~1200 ELO), Club (~1600 ELO), and Master (~2000+ ELO).</li>
+                <li><strong>Interactive Controls</strong>: Supports move takebacks (<kbd>U</kbd> or <kbd>Ctrl+Z</kbd>), position reset (<kbd>Space</kbd>), and dynamic evaluation tracking during play.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🎨 Tactical Board Annotations & Drawing</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Right-Click Tactical Arrows</strong>: Right-click and drag between squares to draw crisp directional arrows on the board.</li>
+                <li><strong>Square Highlight Circles</strong>: Right-click any square to toggle translucent circular markers for candidates or threats.</li>
+                <li><strong>Quick Clear Toolbar</strong>: One-click "Clear Drawings" button to reset annotations anytime.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🧭 Grandmaster Strategic Plans & Motifs</h4>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Thematic Pawn Breaks & Piece Goals</strong>: In-depth strategic breakdowns for Vienna Gambit, Hybrid, Mieses, and standard defenses.</li>
+                <li><strong>Show Plan Arrows</strong>: Toggle visual arrows directly on the board illustrating the grandmaster attacking plans.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Version 1.0.4 */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
