@@ -6,12 +6,17 @@ import {
   UserProgress,
   AppView,
   PlaylistMode,
-  BoardThemeId
+  BoardThemeId,
+  PieceSetId,
+  BlindfoldMode,
+  TimerMode
 } from './types';
 import { parsePgnFile, convertPgnToVariants } from './utils/pgnParser';
 import { soundManager } from './utils/sound';
 import { calculateNextSrsProgress, getDueVariants } from './utils/srs';
 import { BOARD_THEMES } from './utils/boardThemes';
+import { evaluatePosition } from './utils/evaluator';
+import { getCustomPieces } from './utils/pieceSets';
 
 // Modular UI Components
 import { Header } from './components/Header';
@@ -24,6 +29,7 @@ import { ChangelogView } from './components/ChangelogView';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { BoardThemeSelectorModal } from './components/BoardThemeSelectorModal';
 import { ImportPgnModal } from './components/ImportPgnModal';
+import { PieceSetSelectorModal } from './components/PieceSetSelectorModal';
 
 function App() {
   // --- Repertoire State ---
@@ -46,6 +52,7 @@ function App() {
   const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
+  const [isPieceModalOpen, setIsPieceModalOpen] = useState<boolean>(false);
 
   // --- Board Theme & Sound State ---
   const [boardThemeId, setBoardThemeId] = useState<BoardThemeId>(() => {
@@ -54,6 +61,36 @@ function App() {
   });
 
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => soundManager.isEnabled());
+
+  // --- Piece Set & Blindfold Visualization ---
+  const [pieceSetId, setPieceSetId] = useState<PieceSetId>(() => {
+    const saved = localStorage.getItem('chessop_piece_set') as PieceSetId;
+    return saved && ['standard', 'neo', 'alpha'].includes(saved) ? saved : 'standard';
+  });
+
+  const [blindfoldMode, setBlindfoldMode] = useState<BlindfoldMode>(() => {
+    const saved = localStorage.getItem('chessop_blindfold') as BlindfoldMode;
+    return saved && ['off', 'semi', 'full'].includes(saved) ? saved : 'off';
+  });
+
+  // --- Blitz Speed Practice & Streak Counter ---
+  const [timerMode, setTimerMode] = useState<TimerMode>(() => {
+    const saved = localStorage.getItem('chessop_timer_mode') as TimerMode;
+    return saved && ['off', '10s', '5s', '3s'].includes(saved) ? saved : 'off';
+  });
+
+  const maxTime = timerMode === '3s' ? 3 : timerMode === '5s' ? 5 : timerMode === '10s' ? 10 : 0;
+  const [timeLeft, setTimeLeft] = useState<number>(maxTime || 10);
+  const [streak, setStreak] = useState<number>(0);
+  const [bestStreak, setBestStreak] = useState<number>(() => {
+    const saved = localStorage.getItem('chessop_best_streak');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
+  // --- Evaluation Bar ---
+  const [showEvalBar, setShowEvalBar] = useState<boolean>(() => {
+    return localStorage.getItem('chessop_show_eval') === 'true';
+  });
 
   // --- Light / Dark Theme ---
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -89,6 +126,16 @@ function App() {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
   const [maxReachedIndex, setMaxReachedIndex] = useState<number>(0);
+
+  // Position evaluation
+  const evalScore = useMemo(() => {
+    return gameFen ? evaluatePosition(game.current) : { score: 0, label: '0.0', whitePercentage: 50 };
+  }, [gameFen]);
+
+  // Custom piece styles & blindfold mapping
+  const customPieces = useMemo(() => {
+    return getCustomPieces(pieceSetId, blindfoldMode, currentVariant?.side || 'white');
+  }, [pieceSetId, blindfoldMode, currentVariant?.side]);
 
   // --- Load Dynamic PGN on Startup ---
   useEffect(() => {
@@ -177,6 +224,7 @@ function App() {
     setSelectedSquare(null);
     setOptionSquares({});
     setMaxReachedIndex(0);
+    setTimeLeft(maxTime || 10);
     setFeedbackMessage(
       shouldStartDemo
         ? 'Demonstration Mode: Follow the arrow to learn the opening line.'
@@ -189,7 +237,7 @@ function App() {
         makeRivalMoveRef.current?.(0, variant, chessInstance);
       }, 500);
     }
-  }, [currentVariant, userProgress]);
+  }, [currentVariant, userProgress, maxTime]);
 
   // --- Make Rival Move ---
   const makeRivalMove = (index: number, variant: OpeningVariant, chessInstance: Chess) => {
@@ -211,6 +259,7 @@ function App() {
       setMaxReachedIndex(prev => Math.max(prev, nextIndex));
       setGameFen(chessInstance.fen());
       setConsecutiveMistakes(0);
+      setTimeLeft(maxTime || 10);
       
       if (rivalMove.comment) {
         setLastMoveComment(rivalMove.comment);
@@ -281,12 +330,24 @@ function App() {
 
       playMoveAudioFeedback(game.current, isCapture);
 
+      // Streak increase
+      setStreak(prev => {
+        const next = prev + 1;
+        setBestStreak(b => {
+          const max = Math.max(b, next);
+          localStorage.setItem('chessop_best_streak', String(max));
+          return max;
+        });
+        return next;
+      });
+
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
       setMaxReachedIndex(prev => Math.max(prev, nextIndex));
       setGameFen(game.current.fen());
       setFeedbackMessage('Correct!');
       setConsecutiveMistakes(0);
+      setTimeLeft(maxTime || 10);
       if (actualExpectedMove.comment) {
         setLastMoveComment(actualExpectedMove.comment);
       }
@@ -424,10 +485,11 @@ function App() {
   }, [currentVariant, currentIndex, maxReachedIndex, boardError]);
 
   // --- Visual & Acoustic Error Feedback ---
-  const triggerErrorFeedback = () => {
+  const triggerErrorFeedback = useCallback(() => {
     setBoardError(true);
     setFeedbackMessage('Incorrect move. Try again!');
     setConsecutiveMistakes(prev => prev + 1);
+    setStreak(0);
     soundManager.playError();
     
     setSelectedSquare(null);
@@ -436,7 +498,7 @@ function App() {
     setTimeout(() => {
       setBoardError(false);
     }, 800);
-  };
+  }, []);
 
   // --- Trigger Move Hint ---
   const triggerHint = useCallback(() => {
@@ -452,6 +514,33 @@ function App() {
       setShowHintArrow(false);
     }, 2500);
   }, [currentVariant, isCompleted, currentIndex]);
+
+  // --- Blitz Countdown Timer Effect ---
+  useEffect(() => {
+    if (!currentVariant || isCompleted || boardError || timerMode === 'off') {
+      return;
+    }
+
+    const isUserTurn = currentVariant.side === 'white'
+      ? currentIndex % 2 === 0
+      : currentIndex % 2 === 1;
+
+    if (!isUserTurn) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 0.1) {
+          triggerErrorFeedback();
+          return maxTime;
+        }
+        return Number((prev - 0.1).toFixed(1));
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [currentVariant, currentIndex, isCompleted, boardError, timerMode, maxTime, triggerErrorFeedback]);
 
   // --- Handle Successful Training Run ---
   const completeTraining = (variant: OpeningVariant, success: boolean) => {
@@ -556,6 +645,7 @@ function App() {
     setSelectedSquare(null);
     setOptionSquares({});
     setMaxReachedIndex(0);
+    setStreak(0);
     setActiveView('menu');
   }, []);
 
@@ -788,8 +878,10 @@ function App() {
       customVariants,
       theme,
       boardThemeId,
+      pieceSetId,
+      bestStreak,
       exportedAt: new Date().toISOString(),
-      version: '1.0.2'
+      version: '1.0.3'
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -811,6 +903,10 @@ function App() {
         setCustomVariants(data.customVariants);
         localStorage.setItem('chessop_custom_variants', JSON.stringify(data.customVariants));
       }
+      if (data.bestStreak) {
+        setBestStreak(data.bestStreak);
+        localStorage.setItem('chessop_best_streak', String(data.bestStreak));
+      }
       alert('Backup restored successfully!');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid format';
@@ -821,23 +917,28 @@ function App() {
   const handleResetProgress = () => {
     if (window.confirm('Are you sure you want to reset all training statistics? This cannot be undone.')) {
       setUserProgress({});
+      setStreak(0);
+      setBestStreak(0);
       localStorage.removeItem('chessop_progress');
+      localStorage.removeItem('chessop_best_streak');
     }
   };
 
   // --- Global Keyboard Shortcuts Listener ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept when user is typing in an input or textarea
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
-      // Close open modals with Esc
       if (e.key === 'Escape') {
         if (isThemeModalOpen) {
           setIsThemeModalOpen(false);
+          return;
+        }
+        if (isPieceModalOpen) {
+          setIsPieceModalOpen(false);
           return;
         }
         if (isImportModalOpen) {
@@ -854,19 +955,16 @@ function App() {
         }
       }
 
-      // Toggle sound with 'm'
       if (e.key === 'm' || e.key === 'M') {
         handleToggleSound();
         return;
       }
 
-      // Open shortcuts dialog with '?'
       if (e.key === '?') {
         setIsShortcutsModalOpen(true);
         return;
       }
 
-      // Training view shortcuts
       if (currentVariant) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault();
@@ -890,6 +988,7 @@ function App() {
     currentVariant,
     isDemoMode,
     isThemeModalOpen,
+    isPieceModalOpen,
     isImportModalOpen,
     isShortcutsModalOpen,
     handleNavigateBackward,
@@ -908,6 +1007,7 @@ function App() {
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        onOpenPieceModal={() => setIsPieceModalOpen(true)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onResetToMenu={resetToMenu}
@@ -935,6 +1035,28 @@ function App() {
             optionSquares={optionSquares}
             nextVariantInChapter={nextVariantInChapter}
             demoArrows={getDemoArrows()}
+            streak={streak}
+            bestStreak={bestStreak}
+            timerMode={timerMode}
+            timeLeft={timeLeft}
+            maxTime={maxTime}
+            onSetTimerMode={(mode) => {
+              setTimerMode(mode);
+              localStorage.setItem('chessop_timer_mode', mode);
+            }}
+            evalScore={evalScore}
+            showEvalBar={showEvalBar}
+            onToggleEvalBar={() => {
+              const next = !showEvalBar;
+              setShowEvalBar(next);
+              localStorage.setItem('chessop_show_eval', String(next));
+            }}
+            blindfoldMode={blindfoldMode}
+            customPieces={customPieces}
+            allVariants={variants}
+            userProgress={userProgress}
+            onSelectBranch={(branch) => startVariant(branch, isDemoMode)}
+            onOpenPieceModal={() => setIsPieceModalOpen(true)}
             onPieceDrop={handlePieceDrop}
             onSquareClick={handleSquareClick}
             onNavigateBackward={handleNavigateBackward}
@@ -1000,7 +1122,7 @@ function App() {
 
       {/* FLOATING VERSION WIDGET */}
       <VersionWidget
-        version="v1.0.2"
+        version="v1.0.3"
         onOpenChangelog={() => {
           setCurrentVariant(null);
           setIsCompleted(false);
@@ -1015,6 +1137,21 @@ function App() {
         onClose={() => setIsThemeModalOpen(false)}
         currentTheme={boardThemeId}
         onSelectTheme={handleSelectBoardTheme}
+      />
+
+      <PieceSetSelectorModal
+        isOpen={isPieceModalOpen}
+        onClose={() => setIsPieceModalOpen(false)}
+        currentPieceSet={pieceSetId}
+        onSelectPieceSet={(id) => {
+          setPieceSetId(id);
+          localStorage.setItem('chessop_piece_set', id);
+        }}
+        currentBlindfold={blindfoldMode}
+        onSelectBlindfold={(mode) => {
+          setBlindfoldMode(mode);
+          localStorage.setItem('chessop_blindfold', mode);
+        }}
       />
 
       <ImportPgnModal

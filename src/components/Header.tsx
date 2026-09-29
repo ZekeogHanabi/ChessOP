@@ -6,7 +6,8 @@ import {
   VolumeX,
   Palette,
   Upload,
-  Keyboard
+  Keyboard,
+  Layers
 } from 'lucide-react';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   soundEnabled: boolean;
   onToggleSound: () => void;
   onOpenThemeModal: () => void;
+  onOpenPieceModal: () => void;
   onOpenImportModal: () => void;
   onOpenShortcutsModal: () => void;
   onResetToMenu: () => void;
@@ -26,6 +28,7 @@ export const Header: React.FC<Props> = ({
   soundEnabled,
   onToggleSound,
   onOpenThemeModal,
+  onOpenPieceModal,
   onOpenImportModal,
   onOpenShortcutsModal,
   onResetToMenu
@@ -66,6 +69,16 @@ export const Header: React.FC<Props> = ({
           aria-label="Change Board Colors"
         >
           <Palette size={17} />
+        </button>
+
+        {/* Piece Set & Blindfold Selector */}
+        <button
+          onClick={onOpenPieceModal}
+          className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+          title="Piece Sets & Blindfold Visualization"
+          aria-label="Piece Sets and Blindfold"
+        >
+          <Layers size={17} />
         </button>
 
         {/* Custom PGN Import */}

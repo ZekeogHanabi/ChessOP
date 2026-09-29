@@ -8,9 +8,23 @@ import {
   CheckCircle2,
   Award,
   Sparkles,
-  Keyboard
+  Keyboard,
+  Timer,
+  Flame,
+  Gauge,
+  EyeOff,
+  Palette
 } from 'lucide-react';
-import { OpeningVariant, PlaylistMode, BoardThemeConfig } from '../types';
+import {
+  OpeningVariant,
+  PlaylistMode,
+  BoardThemeConfig,
+  TimerMode,
+  BlindfoldMode,
+  PositionEvaluation,
+  UserProgress
+} from '../types';
+import { BranchExplorer } from './BranchExplorer';
 
 interface Props {
   currentVariant: OpeningVariant;
@@ -31,6 +45,23 @@ interface Props {
   optionSquares: Record<string, React.CSSProperties>;
   nextVariantInChapter: OpeningVariant | null;
   demoArrows: string[][] | undefined;
+  // Features: Timer, Streak, Eval, Blindfold, Branches
+  streak: number;
+  bestStreak: number;
+  timerMode: TimerMode;
+  timeLeft: number;
+  maxTime: number;
+  onSetTimerMode: (mode: TimerMode) => void;
+  evalScore: PositionEvaluation;
+  showEvalBar: boolean;
+  onToggleEvalBar: () => void;
+  blindfoldMode: BlindfoldMode;
+  customPieces?: Record<string, (args: { squareWidth: number }) => React.ReactElement>;
+  allVariants: OpeningVariant[];
+  userProgress: Record<string, UserProgress>;
+  onSelectBranch: (variant: OpeningVariant) => void;
+  onOpenPieceModal: () => void;
+  // Handlers
   onPieceDrop: (sourceSquare: string, targetSquare: string) => boolean;
   onSquareClick: (square: string) => void;
   onNavigateBackward: () => void;
@@ -62,6 +93,21 @@ export const TrainingView: React.FC<Props> = ({
   optionSquares,
   nextVariantInChapter,
   demoArrows,
+  streak,
+  bestStreak,
+  timerMode,
+  timeLeft,
+  maxTime,
+  onSetTimerMode,
+  evalScore,
+  showEvalBar,
+  onToggleEvalBar,
+  blindfoldMode,
+  customPieces,
+  allVariants,
+  userProgress,
+  onSelectBranch,
+  onOpenPieceModal,
   onPieceDrop,
   onSquareClick,
   onNavigateBackward,
@@ -74,9 +120,9 @@ export const TrainingView: React.FC<Props> = ({
   onOpenShortcutsModal
 }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-7xl mx-auto w-full animate-fadeIn pb-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start max-w-7xl mx-auto w-full animate-fadeIn pb-8">
       {/* SIDE CONTROL PANEL */}
-      <div className="lg:col-span-4 space-y-6 order-2 lg:order-1 flex flex-col justify-center h-full">
+      <div className="lg:col-span-4 space-y-5 order-2 lg:order-1 flex flex-col justify-start">
         {/* Navigation & Header */}
         <div className="space-y-3">
           <button
@@ -116,15 +162,17 @@ export const TrainingView: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Toggles & Modes */}
+        {/* Training Modes & Controls Panel */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4 shadow-xs">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Side</span>
-            <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">
+          {/* Side Info */}
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-semibold text-neutral-400 uppercase tracking-wider">Side</span>
+            <span className="font-bold text-neutral-600 dark:text-neutral-300">
               Playing as {currentVariant.side === 'white' ? 'White' : 'Black'}
             </span>
           </div>
 
+          {/* Mode Switcher */}
           <div className="border-t border-neutral-100 dark:border-neutral-800 pt-3">
             <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">Practice Mode</span>
             <div className="grid grid-cols-2 gap-2 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
@@ -150,10 +198,67 @@ export const TrainingView: React.FC<Props> = ({
               </button>
             </div>
           </div>
+
+          {/* Speed Practice Blitz Timer Selector */}
+          <div className="border-t border-neutral-100 dark:border-neutral-800 pt-3">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                <Timer size={12} className="text-brand-primary" />
+                Blitz Speed Timer
+              </span>
+              {timerMode !== 'off' && (
+                <span className="text-[10px] font-bold text-brand-primary uppercase">Active</span>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
+              {(['off', '10s', '5s', '3s'] as TimerMode[]).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => onSetTimerMode(mode)}
+                  className={`py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer capitalize ${
+                    timerMode === mode
+                      ? 'bg-white dark:bg-neutral-700 shadow-xs text-brand-primary'
+                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Toolbar (Evaluation Bar & Blindfold Modal) */}
+          <div className="border-t border-neutral-100 dark:border-neutral-800 pt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={onToggleEvalBar}
+              className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                showEvalBar
+                  ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                  : 'border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+              }`}
+              title="Toggle Offline Position Evaluation Bar"
+            >
+              <Gauge size={13} />
+              <span>Eval: {showEvalBar ? evalScore.label : 'Off'}</span>
+            </button>
+
+            <button
+              onClick={onOpenPieceModal}
+              className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                blindfoldMode !== 'off'
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  : 'border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+              }`}
+              title="Customize piece styles or toggle blindfold mode"
+            >
+              {blindfoldMode !== 'off' ? <EyeOff size={13} /> : <Palette size={13} />}
+              <span>{blindfoldMode === 'off' ? 'Pieces' : 'Blindfold'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Dynamic Strategic Commentary */}
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 min-h-[140px] flex flex-col justify-between shadow-xs relative overflow-hidden">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 min-h-[130px] flex flex-col justify-between shadow-xs relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary" />
           <div className="space-y-2">
             <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center">
@@ -192,6 +297,60 @@ export const TrainingView: React.FC<Props> = ({
 
       {/* CHESSBOARD GRAPHIC CONTAINER */}
       <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
+        {/* Streak & Timer HUD Header */}
+        <div className="w-full max-w-[775px] mb-2 flex items-center justify-between px-1">
+          {/* Streak indicator */}
+          <div className="flex items-center gap-2">
+            {streak >= 3 ? (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 flex items-center gap-1 animate-pulse">
+                <Flame size={13} className="fill-orange-500 text-orange-500" />
+                {streak} Move Streak!
+              </span>
+            ) : streak > 0 ? (
+              <span className="text-[11px] font-bold text-neutral-400">
+                Streak: {streak}
+              </span>
+            ) : null}
+
+            {bestStreak > 0 && (
+              <span className="text-[10px] text-neutral-400 font-semibold">
+                (Best: {bestStreak})
+              </span>
+            )}
+          </div>
+
+          {/* Blindfold indicator badge */}
+          {blindfoldMode !== 'off' && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+              <EyeOff size={11} />
+              {blindfoldMode === 'semi' ? 'Semi-Blindfold' : 'Full Blindfold'}
+            </span>
+          )}
+        </div>
+
+        {/* Live Timer Countdown Bar (when Blitz mode active) */}
+        {timerMode !== 'off' && !isCompleted && (
+          <div className="w-full max-w-[775px] mb-3 space-y-1 animate-fadeIn">
+            <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 px-1">
+              <span className="flex items-center gap-1">
+                <Timer size={11} className={timeLeft <= 2 ? 'text-red-500 animate-spin' : 'text-neutral-400'} />
+                MOVE TIME
+              </span>
+              <span className={timeLeft <= 2 ? 'text-red-500 font-black' : 'text-neutral-500'}>
+                {timeLeft.toFixed(1)}s
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-100 ease-linear rounded-full ${
+                  timeLeft <= 2 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-brand-primary'
+                }`}
+                style={{ width: `${(timeLeft / maxTime) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Minimalist Feedback Banner & Dynamic Hint Button */}
         <div className="w-full max-w-[775px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
           {feedbackMessage && (
@@ -227,7 +386,7 @@ export const TrainingView: React.FC<Props> = ({
             <span>VARIATION PROGRESS</span>
             <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
           </div>
-          <div className="w-full h-2.5 bg-neutral-200 dark:bg-neutral-800/80 rounded-full overflow-hidden border border-neutral-300/10 dark:border-neutral-700/10 shadow-inner">
+          <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-800/80 rounded-full overflow-hidden border border-neutral-300/10 dark:border-neutral-700/10 shadow-inner">
             <div
               className="h-full bg-gradient-to-r from-brand-primary/60 via-brand-primary to-brand-primary/95 rounded-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(140,106,92,0.3)]"
               style={{ width: `${(currentIndex / currentVariant.moves.length) * 100}%` }}
@@ -235,33 +394,50 @@ export const TrainingView: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Chessboard container with Error/Success borders */}
-        <div
-          className={`w-full max-w-[775px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
-            boardError 
-              ? 'border-red-500/80 scale-[0.99] shake-animation' 
-              : isCompleted 
-              ? 'border-green-500/80 scale-[1.01]' 
-              : 'border-white dark:border-neutral-850'
-          }`}
-        >
-          <Chessboard
-            position={gameFen}
-            onPieceDrop={onPieceDrop}
-            onSquareClick={onSquareClick}
-            customSquareStyles={{
-              ...optionSquares,
-              ...(selectedSquare && {
-                [selectedSquare]: { backgroundColor: 'rgba(140, 106, 92, 0.35)' }
-              })
-            }}
-            boardOrientation={currentVariant.side}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            customArrows={demoArrows as any}
-            customDarkSquareStyle={{ backgroundColor: boardTheme.darkSquare }}
-            customLightSquareStyle={{ backgroundColor: boardTheme.lightSquare }}
-            animationDuration={250}
-          />
+        {/* Board Wrapper with Optional Evaluation Bar */}
+        <div className="w-full max-w-[775px] flex items-stretch gap-3">
+          {/* Vertical Evaluation Bar */}
+          {showEvalBar && (
+            <div className="w-4 rounded-xl bg-neutral-900 border border-neutral-300 dark:border-neutral-700 overflow-hidden flex flex-col justify-end shadow-md relative shrink-0">
+              <div
+                className="w-full bg-neutral-100 transition-all duration-300 ease-out"
+                style={{ height: `${evalScore.whitePercentage}%` }}
+              />
+              <div className="absolute top-1 left-0 right-0 text-[8px] font-black text-center text-neutral-400 select-none">
+                {evalScore.label}
+              </div>
+            </div>
+          )}
+
+          {/* Chessboard container with Error/Success borders */}
+          <div
+            className={`w-full aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
+              boardError 
+                ? 'border-red-500/80 scale-[0.99] shake-animation' 
+                : isCompleted 
+                ? 'border-green-500/80 scale-[1.01]' 
+                : 'border-white dark:border-neutral-850'
+            }`}
+          >
+            <Chessboard
+              position={gameFen}
+              onPieceDrop={onPieceDrop}
+              onSquareClick={onSquareClick}
+              customSquareStyles={{
+                ...optionSquares,
+                ...(selectedSquare && {
+                  [selectedSquare]: { backgroundColor: 'rgba(140, 106, 92, 0.35)' }
+                })
+              }}
+              boardOrientation={currentVariant.side}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              customArrows={demoArrows as any}
+              customDarkSquareStyle={{ backgroundColor: boardTheme.darkSquare }}
+              customLightSquareStyle={{ backgroundColor: boardTheme.lightSquare }}
+              customPieces={customPieces}
+              animationDuration={250}
+            />
+          </div>
         </div>
 
         {/* Chessboard Navigation Controls (Backward, Counter, Forward) */}
@@ -299,6 +475,15 @@ export const TrainingView: React.FC<Props> = ({
           </button>
         </div>
 
+        {/* Repertoire Branch Explorer */}
+        <BranchExplorer
+          currentVariant={currentVariant}
+          currentIndex={currentIndex}
+          allVariants={allVariants}
+          userProgress={userProgress}
+          onSelectVariant={onSelectBranch}
+        />
+
         {/* Victory Overlay Panel */}
         {isCompleted && (
           <div className="w-full max-w-[775px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-xs">
@@ -309,7 +494,7 @@ export const TrainingView: React.FC<Props> = ({
             <p className="text-xs text-green-600 dark:text-green-400/80 mt-1">
               {isDemoMode 
                 ? 'You completed the demo. Now try it from memory in Practice Mode!' 
-                : 'Perfect recall! Your repetition interval has been updated.'
+                : 'Perfect recall! Your repetition interval and accuracy have been recorded.'
               }
             </p>
             <div className="flex gap-2 justify-center mt-3">

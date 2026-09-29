@@ -39,5 +39,16 @@ export interface BoardThemeConfig {
   darkSquare: string;
 }
 
+export type PieceSetId = 'standard' | 'neo' | 'alpha';
+export type BlindfoldMode = 'off' | 'semi' | 'full';
+export type TimerMode = 'off' | '10s' | '5s' | '3s';
+
+export interface PositionEvaluation {
+  score: number; // in pawns e.g. +0.45
+  label: string; // "+0.5" or "-1.2"
+  whitePercentage: number; // 0 to 100 for visual bar
+  isMate?: boolean;
+}
+
 export type AppView = 'menu' | 'vienna-directory' | 'changelog';
 export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs';
