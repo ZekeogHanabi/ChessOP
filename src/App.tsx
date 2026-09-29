@@ -1479,6 +1479,8 @@ function App() {
             onStartSrsReview={startSrsReview}
             onOpenAnalytics={() => setActiveView('analytics')}
             onOpenCampaign={openCampaign}
+            onOpenInstallModal={() => setIsInstallModalOpen(true)}
+            canInstall={canInstall && !isInstalled}
             onDeleteCustomRepertoire={handleDeleteCustomRepertoire}
             onExportProgress={handleExportProgress}
             onImportProgress={handleImportProgress}

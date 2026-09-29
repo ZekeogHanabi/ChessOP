@@ -108,3 +108,19 @@ body {
 .animate-soft-float {
   animation: softFloat 2.6s ease-in-out infinite;
 }
+
+/* Mobile Safe Area & PWA Touch Optimizations */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+html, body {
+  overscroll-behavior-y: contain;
+}
+
+button, a {
+  touch-action: manipulation;
+}
+

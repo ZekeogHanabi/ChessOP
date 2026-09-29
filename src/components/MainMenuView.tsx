@@ -12,7 +12,8 @@ import {
   Sparkles,
   BarChart3,
   Star,
-  Map
+  Map,
+  Smartphone
 } from 'lucide-react';
 import { OpeningVariant, UserProgress, GamificationProfile } from '../types';
 
@@ -41,6 +42,8 @@ interface Props {
   onStartSrsReview: () => void;
   onOpenAnalytics: () => void;
   onOpenCampaign?: () => void;
+  onOpenInstallModal?: () => void;
+  canInstall?: boolean;
   onDeleteCustomRepertoire: (openingName: string) => void;
   onExportProgress: () => void;
   onImportProgress: (jsonString: string) => void;
@@ -63,6 +66,8 @@ export const MainMenuView: React.FC<Props> = ({
   onStartSrsReview,
   onOpenAnalytics,
   onOpenCampaign,
+  onOpenInstallModal,
+  canInstall,
   onDeleteCustomRepertoire,
   onExportProgress,
   onImportProgress,
@@ -414,6 +419,38 @@ export const MainMenuView: React.FC<Props> = ({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* PWA Mobile & Offline Install Card */}
+      {canInstall && onOpenInstallModal && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-brand-primary/5 to-transparent border border-amber-500/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fadeIn shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 shadow-xs">
+              <Smartphone size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-neutral-900 dark:text-neutral-100">
+                  Install ChessOp as an App
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                  Offline Ready
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Practice openings and spar against the bot completely offline—anytime, anywhere.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenInstallModal}
+            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            <Download size={14} />
+            <span>Install App</span>
+          </button>
         </div>
       )}
 
