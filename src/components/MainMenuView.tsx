@@ -177,17 +177,17 @@ export const MainMenuView: React.FC<Props> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-                  Nuevo • Modo Aventura
+                  New • Campaign Mode
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                  Ruta Gráfica
+                  Visual Roadmap
                 </span>
               </div>
               <h3 className="text-lg md:text-xl font-black tracking-tight text-neutral-900 dark:text-neutral-100 mt-0.5">
-                Ruta de Niveles de Aperturas
+                Interactive Opening Roadmap
               </h3>
               <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-xl mt-1">
-                Avanza casilla a casilla por el camino sinuoso, conquista las 3 estrellas en cada variante teórica y derrota a los Jefes de Sparring.
+                Advance node by node along the winding path, earn 3 stars in every theoretical variation, and defeat the Boss Sparring bots.
               </p>
             </div>
           </div>
@@ -197,7 +197,7 @@ export const MainMenuView: React.FC<Props> = ({
             className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-brand-primary hover:from-amber-500 hover:to-brand-primary/95 text-white font-black text-xs md:text-sm tracking-wide shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 shrink-0 self-start md:self-auto"
           >
             <Play size={14} className="fill-white" />
-            <span>Explorar Ruta de Niveles</span>
+            <span>Explore Campaign Map</span>
           </button>
         </div>
       )}

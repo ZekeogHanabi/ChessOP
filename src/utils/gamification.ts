@@ -8,14 +8,14 @@ export interface LevelInfo {
 }
 
 export const LEVELS: LevelInfo[] = [
-  { level: 1, title: 'Peón Curioso', minXp: 0, maxXp: 100 },
-  { level: 2, title: 'Caballo Táctico', minXp: 100, maxXp: 250 },
-  { level: 3, title: 'Alfil Incisivo', minXp: 250, maxXp: 500 },
-  { level: 4, title: 'Torre de Asalto', minXp: 500, maxXp: 900 },
-  { level: 5, title: 'Dama Dominante', minXp: 900, maxXp: 1500 },
-  { level: 6, title: 'Rey de la Vienesa', minXp: 1500, maxXp: 2500 },
-  { level: 7, title: 'Maestro del Gambito', minXp: 2500, maxXp: 4000 },
-  { level: 8, title: 'Gran Maestro Legendario', minXp: 4000, maxXp: 100000 }
+  { level: 1, title: 'Curious Pawn', minXp: 0, maxXp: 100 },
+  { level: 2, title: 'Tactical Knight', minXp: 100, maxXp: 250 },
+  { level: 3, title: 'Incisive Bishop', minXp: 250, maxXp: 500 },
+  { level: 4, title: 'Attacking Rook', minXp: 500, maxXp: 900 },
+  { level: 5, title: 'Dominant Queen', minXp: 900, maxXp: 1500 },
+  { level: 6, title: 'Vienna Master', minXp: 1500, maxXp: 2500 },
+  { level: 7, title: 'Gambit Tactician', minXp: 2500, maxXp: 4000 },
+  { level: 8, title: 'Legendary Grandmaster', minXp: 4000, maxXp: 100000 }
 ];
 
 export const getLevelForXp = (xp: number): {
@@ -183,22 +183,22 @@ export const createMoveFeedbackBadge = (
   if (comboCount >= 3) {
     return {
       type: 'combo',
-      text: `🔥 ¡COMBO x${comboCount}!`,
-      subtext: '¡Racha en llamas!'
+      text: `🔥 COMBO x${comboCount}!`,
+      subtext: 'Streak on fire!'
     };
   }
 
   if (isTacticalOrGambitKey) {
     return {
       type: 'key',
-      text: '💎 ¡Jugada Clave!',
-      subtext: `Precisión brillante con ${notation}`
+      text: '💎 Key Move!',
+      subtext: `Brilliant precision with ${notation}`
     };
   }
 
   return {
     type: 'book',
-    text: '📚 Jugada de Libro',
-    subtext: `Teoría exacta: ${notation}`
+    text: '📚 Book Move',
+    subtext: `Exact theory: ${notation}`
   };
 };

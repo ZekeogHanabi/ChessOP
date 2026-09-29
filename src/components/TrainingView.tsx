@@ -682,7 +682,7 @@ export const TrainingView: React.FC<Props> = ({
           <div className="w-full max-w-[775px] mb-4 space-y-1.5 animate-fadeIn">
             <div className="flex justify-between items-center px-1 text-[10px] font-bold tracking-wider">
               <span className="text-neutral-500 dark:text-neutral-400 uppercase">
-                Progreso: {Math.min(currentIndex, currentVariant.moves.length)} / {currentVariant.moves.length} jugadas
+                Progress: {Math.min(currentIndex, currentVariant.moves.length)} / {currentVariant.moves.length} moves
               </span>
 
               {/* Live Precision Meter */}
@@ -694,7 +694,7 @@ export const TrainingView: React.FC<Props> = ({
                     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
                     : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
                 }`}>
-                  <span>Precisión: {precision}%</span>
+                  <span>Precision: {precision}%</span>
                   <div className="flex items-center gap-0.5">
                     <Star size={11} className={`fill-current ${precision >= 25 ? 'text-amber-400' : 'text-neutral-400'}`} />
                     <Star size={11} className={`fill-current ${precision >= 80 ? 'text-amber-400' : 'text-neutral-300 dark:text-neutral-600'}`} />
@@ -866,20 +866,20 @@ export const TrainingView: React.FC<Props> = ({
               <Trophy size={20} className="text-amber-500" />
               <span>
                 {isDemoMode
-                  ? 'Demostración Completada'
+                  ? 'Demonstration Complete'
                   : precision >= 100
-                  ? '¡Perfección Absoluta! ⭐⭐⭐'
+                  ? 'Absolute Perfection! ⭐⭐⭐'
                   : precision >= 80
-                  ? '¡Gran Ejecución Teórica! ⭐⭐'
-                  : '¡Variante Conquistada! ⭐'}
+                  ? 'Great Theoretical Execution! ⭐⭐'
+                  : 'Variation Conquered! ⭐'}
               </span>
             </h3>
 
             {/* Subtitle / assessment */}
             <p className="text-xs md:text-sm text-neutral-600 dark:text-neutral-300 mt-1 max-w-lg mx-auto">
               {isDemoMode
-                ? 'Has completado la demostración guiada. ¡Ahora ponla a prueba desde la memoria en el Modo Práctica!'
-                : `Completaste la variante con un ${precision}% de precisión teórica en tus movimientos.`}
+                ? 'You have completed the guided demonstration. Now test yourself from memory in Practice Mode!'
+                : `You completed the variation with ${precision}% theoretical accuracy.`}
             </p>
 
             {/* Stats & Rewards Ribbon */}
@@ -893,11 +893,11 @@ export const TrainingView: React.FC<Props> = ({
                 </div>
 
                 <div className="px-3.5 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                  <span>Rango: <strong>{gamificationProfile?.title || 'Peón Curioso'}</strong></span>
+                  <span>Rank: <strong>{gamificationProfile?.title || 'Curious Pawn'}</strong></span>
                 </div>
 
                 <div className="px-3.5 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                  <span>Total Estrellas: <strong>⭐ {gamificationProfile?.totalStars || 0}</strong></span>
+                  <span>Total Stars: <strong>⭐ {gamificationProfile?.totalStars || 0}</strong></span>
                 </div>
               </div>
             )}
@@ -908,10 +908,10 @@ export const TrainingView: React.FC<Props> = ({
               <button
                 onClick={onStartSparring}
                 className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-                title="Jugar la posición resultante contra el bot de IA"
+                title="Play the resulting position against the AI engine"
               >
                 <Swords size={14} />
-                <span>Jugar Sparring vs Bot</span>
+                <span>Play AI Sparring Duel</span>
               </button>
 
               <button
@@ -919,7 +919,7 @@ export const TrainingView: React.FC<Props> = ({
                 className="px-4 py-2 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
               >
                 <RotateCcw size={13} />
-                <span>{precision < 100 && !isDemoMode ? 'Reintentar para 3 ⭐' : 'Practicar de nuevo'}</span>
+                <span>{precision < 100 && !isDemoMode ? 'Retry for 3 ⭐' : 'Practice Again'}</span>
               </button>
 
               {nextVariantInChapter && (
@@ -927,7 +927,7 @@ export const TrainingView: React.FC<Props> = ({
                   onClick={() => onStartNextVariant(nextVariantInChapter)}
                   className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white dark:bg-neutral-100 dark:hover:bg-neutral-200 dark:text-neutral-900 font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
                 >
-                  Siguiente Variante →
+                  Next Variation →
                 </button>
               )}
 
@@ -937,7 +937,7 @@ export const TrainingView: React.FC<Props> = ({
                   className="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
                   <Map size={13} />
-                  <span>Ver en el Mapa de Niveles</span>
+                  <span>View on Campaign Map</span>
                 </button>
               )}
 
@@ -945,7 +945,7 @@ export const TrainingView: React.FC<Props> = ({
                 onClick={onResetToMenu}
                 className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-all cursor-pointer shadow-xs active:scale-95"
               >
-                Volver al Menú
+                Back to Menu
               </button>
             </div>
           </div>

@@ -38,28 +38,28 @@ export const CampaignView: React.FC<Props> = ({
     return CAMPAIGN_WORLDS.find(w => w.id === activeWorldId) || CAMPAIGN_WORLDS[0];
   }, [activeWorldId]);
 
-  // Resuelve la variante para el nivel actualmente seleccionado
+  // Resolve the opening variant for the selected level
   const selectedVariant = useMemo(() => {
     if (!selectedLevel) return null;
     return findVariantForLevel(selectedLevel, allVariants);
   }, [selectedLevel, allVariants]);
 
-  // Calcula estadísticas globales de la campaña
+  // Calculate total stars collected
   const totalCampaignStars = useMemo(() => {
     return gamificationProfile.totalStars || 0;
   }, [gamificationProfile]);
 
-  // Offset horizontal para el camino sinuoso (en porcentaje %)
+  // Horizontal offset for winding roadmap (in percentage %)
   const getNodeXPosition = (index: number, total: number) => {
-    if (index === total - 1) return 50; // El Boss siempre está centrado
+    if (index === total - 1) return 50; // The Boss is always centered
     const pattern = [50, 32, 50, 68, 50, 28, 50, 72];
     return pattern[index % pattern.length];
   };
 
-  // Genera el camino SVG curvado que conecta los nodos
+  // Generate curved SVG road connecting alternating nodes
   const pathD = useMemo(() => {
     const levels = activeWorld.levels;
-    const nodeHeight = 120; // Separación vertical entre nodos en píxeles
+    const nodeHeight = 120; // Vertical spacing between nodes in pixels
     let d = '';
 
     levels.forEach((_, i) => {
@@ -79,7 +79,7 @@ export const CampaignView: React.FC<Props> = ({
     return d;
   }, [activeWorld]);
 
-  // Encuentra el primer nivel no completado en el mundo activo para destacarlo como "Siguiente"
+  // Find the first uncompleted level in active world to highlight as "Next Up"
   const nextTargetLevelIndex = useMemo(() => {
     const idx = activeWorld.levels.findIndex(lvl => {
       const variant = findVariantForLevel(lvl, allVariants);
@@ -98,19 +98,19 @@ export const CampaignView: React.FC<Props> = ({
           <button
             onClick={onBackToMenu}
             className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
-            title="Volver al Menú Principal"
+            title="Back to Main Menu"
           >
             <ArrowLeft size={16} />
           </button>
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                Modo Campaña
+                Campaign Mode
               </span>
-              <span className="text-xs font-bold text-neutral-400">Ruta de Maestría</span>
+              <span className="text-xs font-bold text-neutral-400">Roadmap to Mastery</span>
             </div>
             <h2 className="text-xl md:text-2xl font-black tracking-tight mt-0.5">
-              Mapa de Niveles
+              Opening Campaign Map
             </h2>
           </div>
         </div>
@@ -120,13 +120,13 @@ export const CampaignView: React.FC<Props> = ({
           <div className="flex items-center gap-1.5">
             <Trophy size={16} className="text-amber-500" />
             <span className="text-xs font-black text-neutral-800 dark:text-neutral-200">
-              Nv. {gamificationProfile.level} • {gamificationProfile.title}
+              Lvl. {gamificationProfile.level} • {gamificationProfile.title}
             </span>
           </div>
           <div className="h-4 w-px bg-neutral-300 dark:bg-neutral-700" />
           <div className="flex items-center gap-1 text-xs font-black text-amber-600 dark:text-amber-400">
             <Star size={14} className="fill-amber-400 text-amber-400" />
-            <span>{totalCampaignStars} Estrellas</span>
+            <span>{totalCampaignStars} Stars</span>
           </div>
         </div>
       </div>
@@ -156,7 +156,7 @@ export const CampaignView: React.FC<Props> = ({
             >
               <div className="flex justify-between items-start mb-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-                  Mundo {world.worldNumber}
+                  World {world.worldNumber}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   completedInWorld === world.levels.length
@@ -188,7 +188,7 @@ export const CampaignView: React.FC<Props> = ({
         <div>
           <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
             <Sparkles size={14} />
-            <span>Mundo {activeWorld.worldNumber}: {activeWorld.title}</span>
+            <span>World {activeWorld.worldNumber}: {activeWorld.title}</span>
           </div>
           <p className="text-xs md:text-sm text-neutral-700 dark:text-neutral-300 mt-1 max-w-2xl leading-relaxed">
             {activeWorld.description}
@@ -197,7 +197,7 @@ export const CampaignView: React.FC<Props> = ({
 
         <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
           <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400">
-            {activeWorld.levels.length} Niveles • Acceso Libre con Estrellas ⭐
+            {activeWorld.levels.length} Levels • Star Collection ⭐
           </span>
         </div>
       </div>
@@ -213,7 +213,7 @@ export const CampaignView: React.FC<Props> = ({
           preserveAspectRatio="none"
           className="absolute inset-x-0 top-0 w-full h-full pointer-events-none z-0"
         >
-          {/* Sombra de la ruta */}
+          {/* Shadow line */}
           <path
             d={pathD}
             fill="none"
@@ -222,7 +222,7 @@ export const CampaignView: React.FC<Props> = ({
             strokeLinecap="round"
             className="text-neutral-200 dark:text-neutral-800/80"
           />
-          {/* Ruta dorada punteada activa */}
+          {/* Active golden dashed road */}
           <path
             d={pathD}
             fill="none"
@@ -257,11 +257,11 @@ export const CampaignView: React.FC<Props> = ({
                   top: `${yPixels}px`
                 }}
               >
-                {/* Indicador "Siguiente Desafío" flotante */}
+                {/* Floating "Next Up!" Badge */}
                 {isNextTarget && (
                   <div className="absolute -top-7 animate-bounce whitespace-nowrap z-20">
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-brand-primary text-white shadow-md flex items-center gap-1 uppercase tracking-wider">
-                      <Flame size={10} className="fill-white" /> ¡Siguiente!
+                      <Flame size={10} className="fill-white" /> Next Up!
                     </span>
                   </div>
                 )}
@@ -293,7 +293,7 @@ export const CampaignView: React.FC<Props> = ({
                       ? 'bg-brand-primary text-white border-4 border-brand-primary/50 ring-4 ring-brand-primary/30 animate-pulse shadow-brand-primary/30'
                       : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-2 border-neutral-300 dark:border-neutral-700 hover:border-brand-primary/50'
                   }`}
-                  title={`${level.title} • Haz clic para ver detalles`}
+                  title={`${level.title} • Click to view details`}
                 >
                   {isBoss ? (
                     <Crown size={28} className="fill-white animate-pulse" />
@@ -333,7 +333,7 @@ export const CampaignView: React.FC<Props> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                    Nivel {selectedLevel.levelNumber} • {selectedVariant.side === 'white' ? 'Blancas' : 'Negras'}
+                    Level {selectedLevel.levelNumber} • {selectedVariant.side === 'white' ? 'White' : 'Black'}
                   </span>
                   {selectedLevel.isBoss && (
                     <span className="px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20 flex items-center gap-1">
@@ -367,7 +367,7 @@ export const CampaignView: React.FC<Props> = ({
             {/* Description & Objective */}
             <div className="bg-neutral-50 dark:bg-neutral-800/50 rounded-xl p-4 space-y-2 border border-neutral-100 dark:border-neutral-800 text-xs">
               <span className="font-bold text-neutral-400 uppercase tracking-wider text-[10px] block">
-                Objetivo Teórico
+                Theoretical Objective
               </span>
               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
                 {selectedLevel.description}
@@ -377,23 +377,23 @@ export const CampaignView: React.FC<Props> = ({
             {/* Stats & Rewards Ribbon */}
             <div className="grid grid-cols-3 gap-2.5 text-xs">
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-between">
-                <span className="font-bold text-neutral-400 text-[10px] uppercase">Recompensa:</span>
+                <span className="font-bold text-neutral-400 text-[10px] uppercase">Reward:</span>
                 <span className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
                   <Sparkles size={12} /> +125 XP
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
-                <span className="font-bold text-neutral-400 text-[10px] uppercase">Longitud:</span>
+                <span className="font-bold text-neutral-400 text-[10px] uppercase">Line Depth:</span>
                 <span className="font-black text-neutral-800 dark:text-neutral-200 mt-0.5">
-                  {selectedVariant.moves.length} jugadas
+                  {selectedVariant.moves.length} moves
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex flex-col justify-between">
-                <span className="font-bold text-neutral-400 text-[10px] uppercase">Superado:</span>
+                <span className="font-bold text-neutral-400 text-[10px] uppercase">Mastered:</span>
                 <span className="font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
-                  {userProgress[selectedVariant.id]?.successes || 0}x veces
+                  {userProgress[selectedVariant.id]?.successes || 0}x times
                 </span>
               </div>
             </div>
@@ -409,7 +409,7 @@ export const CampaignView: React.FC<Props> = ({
                   className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs md:text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                 >
                   <Swords size={16} />
-                  <span>¡Desafiar al Jefe (Sparring vs Bot)!</span>
+                  <span>Challenge Boss (AI Sparring Duel)!</span>
                 </button>
               ) : (
                 <>
@@ -421,7 +421,7 @@ export const CampaignView: React.FC<Props> = ({
                     className="py-2.5 px-4 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <BookOpen size={14} />
-                    <span>Ver Demo</span>
+                    <span>Watch Demo</span>
                   </button>
 
                   <button
@@ -432,7 +432,7 @@ export const CampaignView: React.FC<Props> = ({
                     className="flex-1 py-2.5 px-4 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-white font-black text-xs md:text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     <Play size={15} className="fill-white" />
-                    <span>¡Jugar Nivel (Práctica)!</span>
+                    <span>Play Level (Practice)!</span>
                     <ChevronRight size={14} />
                   </button>
                 </>
@@ -442,7 +442,7 @@ export const CampaignView: React.FC<Props> = ({
                 onClick={() => setSelectedLevel(null)}
                 className="py-2.5 px-4 rounded-xl text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
               >
-                Cerrar
+                Close
               </button>
             </div>
           </div>

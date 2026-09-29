@@ -33,9 +33,9 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
             <div>
               <span className="px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                v1.0.8 • Modo Campaña: Mapa Gráfico de Niveles & Batallas de Boss
+                v1.0.8 • Campaign Mode: Graphical Level Roadmap & Boss Battles
               </span>
-              <h3 className="text-2xl font-black mt-2 tracking-tight">Ruta de Niveles Tipo Aventura, Mundos Temáticos y Boss Sparring</h3>
+              <h3 className="text-2xl font-black mt-2 tracking-tight">Adventure Level Roadmap, Themed Worlds & Boss Sparring</h3>
             </div>
             <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
               Released: September 29, 2026
@@ -44,23 +44,23 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
 
           <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
             <p>
-              La versión 1.0.8 introduce el <strong>Modo Campaña (Ruta de Aventuras)</strong>: una experiencia visual de progresión inspirada en los mapas de caminos de Duolingo y Candy Crush, donde dominar aperturas se convierte en una expedición de conquista con estrellas, mundos temáticos y batallas épicas contra jefes.
+              Version 1.0.8 introduces <strong>Campaign Mode (Opening Adventure)</strong>: a visual progression roadmap inspired by Duolingo and Candy Crush, turning opening repertoire mastery into an expedition of conquest with stars, themed worlds, and epic boss sparring battles.
             </p>
             
             <div className="space-y-2">
-              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🗺️ Novedades de la Versión 1.0.8</h4>
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🗺️ What's New in v1.0.8</h4>
               <ul className="list-disc pl-5 space-y-1.5 text-xs">
-                <li><strong>Mapa Gráfico Serpenteante</strong>: Ruta curva visual con nodos alternados flotantes, estrellas conseguidas en tiempo real (⭐/⭐⭐/⭐⭐⭐), avatar pulsante animado en tu próximo desafío recomendado e iluminación de camino completado.</li>
-                <li><strong>3 Mundos Temáticos Iniciales</strong>:
+                <li><strong>Winding Graphical Roadmap</strong>: Curved SVG path with alternating floating nodes, real-time star ratings (⭐/⭐⭐/⭐⭐⭐), pulsing "Next Up!" avatar on recommended challenges, and completed path illumination.</li>
+                <li><strong>3 Initial Themed Worlds</strong>:
                   <ul className="list-circle pl-4 mt-1 space-y-1 text-neutral-500 dark:text-neutral-400">
-                    <li><em>Mundo 1: Reino del Gambito Vienés</em> (8 variantes de teoría agresiva + Jefe Final Vienés).</li>
-                    <li><em>Mundo 2: Las Murallas Negras</em> (Siciliana Najdorf, Francesa Winawer, Caro-Kann + Boss Táctico Asimétrico).</li>
-                    <li><em>Mundo 3: Los Clásicos Abiertos</em> (Ruy López Berlín, Fanchetto & Fegatello + Boss de Final Posicional).</li>
+                    <li><em>World 1: Realm of the Vienna Gambit</em> (8 aggressive theory variations + Vienna Master Boss).</li>
+                    <li><em>World 2: The Black Fortresses</em> (Sicilian Najdorf, French Winawer, Caro-Kann + Asymmetric Tactical Boss).</li>
+                    <li><em>World 3: The Open Classics</em> (Ruy Lopez Berlin Wall, Fanchetto & Fried Liver + Positional Endgame Boss).</li>
                   </ul>
                 </li>
-                <li><strong>Nodos de Jefe Final (Boss Sparring Fights)</strong>: Nodos especiales coronados con espadas cruzadas que transportan la posición teórica final directamente al motor de Sparring contra el Bot para probar si puedes convertir la ventaja en una victoria real.</li>
-                <li><strong>Modal Interactivo de Detalle de Nivel</strong>: Muestra los objetivos teóricos, dificultad, XP en juego, estadísticas personales y accesos directos rápidos para Demostración paso a paso, Práctica guiada o Duelo Sparring.</li>
-                <li><strong>Integración en Todo el Ecosistema</strong>: Acceso instantáneo a la Campaña desde el nuevo botón "Mapa" en el Header, el banner destacado de Aventura en el Menú Principal, y un botón de avance directo en la Tarjeta de Victoria al finalizar una variante.</li>
+                <li><strong>Boss Sparring Fight Nodes</strong>: Special crowned nodes featuring crossed swords that transport the final theoretical position directly into the AI Sparring engine to test whether you can convert the advantage into an over-the-board victory.</li>
+                <li><strong>Interactive Level Details Modal</strong>: Displays theoretical objectives, difficulty, XP rewards, personal completion counts, and quick actions for Demo, Practice, or Boss Sparring Duel.</li>
+                <li><strong>Full Ecosystem Integration</strong>: Instant access to Campaign Mode from the top Header ("Map" button and Level/XP pill), Main Menu Hero Banner, and Victory Performance Card.</li>
               </ul>
             </div>
           </div>
@@ -92,9 +92,9 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
               <ul className="list-disc pl-5 space-y-1.5 text-xs">
                 <li><strong>Calibrated Tactical Evaluation Engine</strong>: Overhauled the offline position evaluator with center control heuristics, pawn space wedges (e.g. <code>e5</code> in Vienna Gambit), development tempo, and open f-file pressure. Gambits now accurately reflect theoretical winning scores (+1.5 to +3.0) instead of naive material deficits.</li>
                 <li><strong>Live Precision Gauge (0% - 100%)</strong>: Real-time accuracy meter on the training HUD that evaluates every move and indicates your live star preview (Emerald 100% ⭐⭐⭐ → Gold 80%+ ⭐⭐ → Amber ⭐).</li>
-                <li><strong>Micro-Animated Floating Badges</strong>: Bouncy, celebratory badges trigger in real time on every move: 📚 <em>Jugada de Libro</em>, 💎 <em>¡Jugada Clave!</em>, 🔥 <em>Combo x3/x5</em>, and ❌ <em>Imprecisión</em>.</li>
+                <li><strong>Micro-Animated Floating Badges</strong>: Bouncy, celebratory badges trigger in real time on every move: 📚 <em>Book Move</em>, 💎 <em>Key Move!</em>, 🔥 <em>Combo x3/x5</em>, and ❌ <em>Inaccuracy</em>.</li>
                 <li><strong>Arcade Victory Performance Card</strong>: Replaced the plain completion box with an arcade victory screen featuring animated golden stars, XP rewards, rank progression, and instant sparring triggers.</li>
-                <li><strong>Player XP & 8 Progression Ranks</strong>: Level progression from <em>Peón Curioso</em> up to <em>Gran Maestro Legendario</em>, with persistent stars and XP displayed in the header and main menu.</li>
+                <li><strong>Player XP & 8 Progression Ranks</strong>: Level progression from <em>Curious Pawn</em> up to <em>Legendary Grandmaster</em>, with persistent stars and XP displayed in the header and main menu.</li>
                 <li><strong>Synthesized Arcade Web Audio</strong>: Delightful chimes for book moves, triumphant chords for key moves, escalating combo tones, and a 3-star fanfare.</li>
               </ul>
             </div>
@@ -169,7 +169,7 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
             </p>
             
             <div className="space-y-2">
-              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🤖 Post-Theory Sparring Bot (Jugar vs Bot)</h4>
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🤖 Post-Theory Sparring Bot (Play vs Bot)</h4>
               <ul className="list-disc pl-5 space-y-1 text-xs">
                 <li><strong>In-Browser Minimax Engine</strong>: Built with Alpha-Beta pruning, MVV-LVA move ordering, and PST evaluations that run 100% offline.</li>
                 <li><strong>3 Calibrated Skill Levels</strong>: Casual (~1200 ELO), Club (~1600 ELO), and Master (~2000+ ELO).</li>
@@ -218,7 +218,7 @@ export const ChangelogView: React.FC<Props> = ({ onBackToMenu }) => {
             </p>
             
             <div className="space-y-2">
-              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🎯 Weak Spots Detector (Talón de Aquiles)</h4>
+              <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🎯 Weak Spots Detector (Achilles' Heel)</h4>
               <ul className="list-disc pl-5 space-y-1 text-xs">
                 <li><strong>Automatic Coordinate Tracking</strong>: Records the exact move number and square coordinates whenever mistakes occur in Practice Mode.</li>
                 <li><strong>One-Click Drill Playlist</strong>: Click "Drill My Weak Spots" to launch an intense, targeted practice session focused specifically on resolving your most recurring gaps.</li>

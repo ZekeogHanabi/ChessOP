@@ -347,8 +347,8 @@ function App() {
     soundManager.playError();
     triggerFeedbackBadge({
       type: 'mistake',
-      text: '❌ Imprecisión',
-      subtext: 'No es la jugada del libro'
+      text: '❌ Inaccuracy',
+      subtext: 'Not the book move'
     });
 
     // Record weak spot if in practice mode!
@@ -931,7 +931,7 @@ function App() {
       setSparringFenSnapshot(chessInstance.fen());
       setSparringGameOverMessage(null);
       setIsBotThinking(false);
-      setFeedbackMessage('⚔️ ¡Duelo de Jefe contra la IA activado! Juega la posición resultante.');
+      setFeedbackMessage('⚔️ AI Boss Duel activated! Play out the resulting theoretical position.');
       soundManager.playKeyMove();
     } else {
       startVariant(variant, isDemo);

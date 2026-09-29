@@ -165,7 +165,7 @@ export const AnalyticsView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Section 1: Weak Spots / Talón de Aquiles */}
+      {/* Section 1: Weak Spots / Achilles' Heel */}
       <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -173,7 +173,7 @@ export const AnalyticsView: React.FC<Props> = ({
               <AlertTriangle size={18} />
             </div>
             <div>
-              <h3 className="text-base font-bold tracking-tight">Theoretical Weak Spots (Talón de Aquiles)</h3>
+              <h3 className="text-base font-bold tracking-tight">Theoretical Weak Spots (Achilles' Heel)</h3>
               <p className="text-xs text-neutral-400">Exact move coordinates where mistakes have occurred most frequently</p>
             </div>
           </div>

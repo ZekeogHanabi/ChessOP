@@ -4,165 +4,165 @@ export const CAMPAIGN_WORLDS: CampaignWorld[] = [
   {
     id: 'world-1-vienna',
     worldNumber: 1,
-    title: 'Reino del Gambito Vienés',
-    subtitle: 'El Dominio Agresivo de 1.e4 e5 2.Nc3',
-    description: 'Aprende paso a paso las 8 variantes maestras de la Apertura Vienesa y derrota al Gran Maestro de la IA en el duelo de Sparring final.',
+    title: 'Realm of the Vienna Gambit',
+    subtitle: 'Aggressive Mastery of 1.e4 e5 2.Nc3',
+    description: 'Master the 8 core chapters of the Vienna Game step by step and defeat the AI Master in the final Sparring Duel.',
     theme: 'gold',
     levels: [
       {
         id: 'vienna-lvl-1',
         levelNumber: 1,
-        title: 'Ataque Steinitz-Paulsen',
-        subtitle: 'Línea Principal (3...d5)',
+        title: 'Steinitz-Paulsen Attack',
+        subtitle: 'Main Line (3...d5)',
         variantId: 'vienna-pgn-ch1-line0',
-        description: 'Enfrenta la réplica más sólida de las negras con el incisivo 5.Qf3! dominando el centro.'
+        description: 'Meet Black\'s most principled counterstrike with the incisive 5.Qf3!, asserting total center dominance.'
       },
       {
         id: 'vienna-lvl-2',
         levelNumber: 2,
-        title: 'Aceptando el Fuego',
-        subtitle: 'Gambito Aceptado (3...exf4)',
+        title: 'Accepting the Fire',
+        subtitle: 'Gambit Accepted (3...exf4)',
         variantId: 'vienna-pgn-ch2-line0',
-        description: 'Castiga la entrega del centro con el avance temático 4.e5!, desalojando el caballo negro.'
+        description: 'Punish the concession of the center with the thematic 4.e5! push, evicting Black\'s key knight.'
       },
       {
         id: 'vienna-lvl-3',
         levelNumber: 3,
-        title: 'Contragolpe de Caballo',
-        subtitle: 'Gambito Declinado (3...Nc6)',
+        title: 'Knight Counter',
+        subtitle: 'Gambit Declined (3...Nc6)',
         variantId: 'vienna-pgn-ch3-line0',
-        description: 'Aprovecha el error posicional negro con 4.fxe5! y 5.d4! formando un rodillo central arrollador.'
+        description: 'Capitalize on Black\'s premature knight move with 4.fxe5! and 5.d4!, setting up an unstoppable central pawn roller.'
       },
       {
         id: 'vienna-lvl-4',
         levelNumber: 4,
-        title: 'La Bóveda de Peón',
-        subtitle: 'Defensa Pasiva (3...d6)',
+        title: 'The Pawn Vault',
+        subtitle: 'Passive Defense (3...d6)',
         variantId: 'vienna-pgn-ch4-line0',
-        description: 'Asedia la estructura tipo Philidor con 4.Nf3, 5.h3 y la avalancha de peones en el flanco de rey.'
+        description: 'Besiege the Philidor-style pawn shell with 4.Nf3, 5.h3, and a crushing kingside pawn avalanche.'
       },
       {
         id: 'vienna-lvl-5',
         levelNumber: 5,
-        title: 'El Espejo Peligroso',
-        subtitle: 'Ataque a la Dama (3...Bc5)',
+        title: 'The Queen\'s Mirror',
+        subtitle: 'Early Bishop Attack (3...Bc5)',
         variantId: 'vienna-pgn-ch5-line0',
-        description: 'Explotar la salida prematura del alfil negro con la agresiva 4.Qg4! Qf6 5.Nd5!.'
+        description: 'Exploit Black\'s premature bishop development with the tactical 4.Qg4! Qf6 5.Nd5!.'
       },
       {
         id: 'vienna-lvl-6',
         levelNumber: 6,
-        title: 'Transición Italiana',
-        subtitle: 'Estructura Clásica (4.d3)',
+        title: 'Italian Transition',
+        subtitle: 'Classical Structure (4.d3)',
         variantId: 'vienna-pgn-ch6-line0',
-        description: 'Desarrollo posicional sólido preparando las rupturas temáticas f4-f5 en el momento idóneo.'
+        description: 'Solid positional development preparing the decisive f4-f5 breakthrough at the optimal moment.'
       },
       {
         id: 'vienna-lvl-7',
         levelNumber: 7,
-        title: 'Caza de Alfiles',
-        subtitle: 'Defensa Posicional (3...Na5)',
+        title: 'Bishop Hunt',
+        subtitle: 'Positional Defense (3...Na5)',
         variantId: 'vienna-pgn-ch7-line0',
-        description: 'Preserva la pareja de alfiles con 4.Be2! manteniendo la armonía de piezas blancas.'
+        description: 'Preserve your powerful bishop pair with 4.Be2!, maintaining harmonious piece coordination.'
       },
       {
         id: 'vienna-lvl-8',
         levelNumber: 8,
-        title: 'Desvíos y Sorpresas',
-        subtitle: 'Refutación de Secundarias (2...Bc5)',
+        title: 'Sidelines & Surprises',
+        subtitle: 'Early Deviations (2...Bc5)',
         variantId: 'vienna-pgn-ch8-line0',
-        description: 'Castiga con precisión quirúrgica las líneas irregulares y desvíos tempranos de las negras.'
+        description: 'Punish irregular sidelines and early bishop detours with surgical theoretical precision.'
       },
       {
         id: 'vienna-lvl-boss',
         levelNumber: 9,
-        title: 'Jefe de Mundo: Duelo Vienés',
-        subtitle: 'Sparring Post-Teoría vs Bot',
+        title: 'World Boss: Vienna Sparring Duel',
+        subtitle: 'Post-Theory Bot Sparring',
         variantId: 'vienna-pgn-ch1-line0',
         isBoss: true,
         bossDifficulty: 'intermediate',
-        description: '¡Prueba de fuego! Juega el medio juego resultante de la Apertura Vienesa contra el motor de IA.'
+        description: 'The trial by fire! Convert your theoretical advantage into a full victory against the AI sparring bot.'
       }
     ]
   },
   {
     id: 'world-2-asymmetric',
     worldNumber: 2,
-    title: 'Las Murallas Negras',
-    subtitle: 'Defensas Asimétricas de Élite',
-    description: 'Domina los contraataques más respetados del ajedrez moderno jugando con las piezas negras.',
+    title: 'The Black Fortresses',
+    subtitle: 'Elite Asymmetric Defenses',
+    description: 'Master the most feared counterattacking weapons in modern chess playing from the Black perspective.',
     theme: 'emerald',
     levels: [
       {
         id: 'asym-lvl-1',
         levelNumber: 1,
-        title: 'Defensa Siciliana: Najdorf',
-        subtitle: 'Contrajuego Asimétrico Afilado',
+        title: 'Sicilian Defense: Najdorf',
+        subtitle: 'Sharp Asymmetric Counterplay',
         variantId: 'sicilian-najdorf',
-        description: 'La defensa favorita de Kasparov y Fischer. Lucha asimétrica por el centro con peón c.'
+        description: 'Fischer and Kasparov\'s ultimate weapon. Fight for the center asymmetrically with dynamic flank play.'
       },
       {
         id: 'asym-lvl-2',
         levelNumber: 2,
-        title: 'Defensa Caro-Kann: Clásica',
-        subtitle: 'Estructura de Acero (1.e4 c6)',
+        title: 'Caro-Kann Defense: Classical',
+        subtitle: 'Steel Pawn Structure (1.e4 c6)',
         variantId: 'caro-kann-classical',
-        description: 'Solidez granítica para neutralizar la iniciativa blanca y castigar el exceso de ambición.'
+        description: 'Rock-solid structure neutralizing White\'s initiative and punishing overambitious attacks.'
       },
       {
         id: 'asym-lvl-boss',
         levelNumber: 3,
-        title: 'Jefe de Mundo: Bastión Siciliano',
-        subtitle: 'Sparring vs Bot en Posición Najdorf',
+        title: 'World Boss: Sicilian Bastion',
+        subtitle: 'Najdorf Sparring vs AI Bot',
         variantId: 'sicilian-najdorf',
         isBoss: true,
         bossDifficulty: 'master',
-        description: 'Demuestra tu comprensión estratégica convirtiendo el dinamismo siciliano en victoria contra el Bot.'
+        description: 'Prove your strategic mastery by converting dynamic Sicilian advantages into victory against the AI.'
       }
     ]
   },
   {
     id: 'world-3-open-classics',
     worldNumber: 3,
-    title: 'Los Clásicos Abiertos',
-    subtitle: 'La Gran Escuela Española',
-    description: 'Los pilares posicionales del ajedrez tradicional con 1.e4 e5 y el Muro de Berlín.',
+    title: 'The Open Classics',
+    subtitle: 'The Grand Spanish School',
+    description: 'The positional bedrock of classical chess featuring 1.e4 e5 and the legendary Berlin Wall.',
     theme: 'sapphire',
     levels: [
       {
         id: 'open-lvl-1',
         levelNumber: 1,
-        title: 'Ruy Lopez: Muro de Berlín',
-        subtitle: 'Defensa Berlinesa (3...Nf6)',
+        title: 'Ruy Lopez: Berlin Defense',
+        subtitle: 'The Berlin Wall (3...Nf6)',
         variantId: 'ruy-lopez-berlin',
-        description: 'La muralla que Vladimir Kramnik utilizó para derrocar a Garry Kasparov en el Campeonato Mundial.'
+        description: 'The impenetrable fortress used by Vladimir Kramnik to dethrone Garry Kasparov in the World Championship.'
       },
       {
         id: 'open-lvl-boss',
         levelNumber: 2,
-        title: 'Jefe de Mundo: Duelo de la Berlinesa',
-        subtitle: 'Final Posicional vs Bot',
+        title: 'World Boss: Berlin Fortress Duel',
+        subtitle: 'Positional Endgame Sparring vs Bot',
         variantId: 'ruy-lopez-berlin',
         isBoss: true,
         bossDifficulty: 'master',
-        description: 'Aguanta la presión y neutraliza la actividad de las piezas blancas en un final magistral.'
+        description: 'Withstand the pressure, mobilize the bishop pair, and neutralize White\'s activity in a masterclass endgame.'
       }
     ]
   }
 ];
 
 /**
- * Resuelve una variante del repertorio correspondiente a un nivel de la campaña
+ * Resolves a repertoire variation corresponding to a campaign level
  */
 export const findVariantForLevel = (
   level: { variantId: string; levelNumber?: number },
   allVariants: OpeningVariant[]
 ): OpeningVariant | undefined => {
-  // 1. Intento por ID exacto
+  // 1. Try exact ID match
   let found = allVariants.find(v => v.id === level.variantId);
   if (found) return found;
 
-  // 2. Si es de la vienesa y busca ch1, ch2, etc.
+  // 2. If it's a Vienna chapter (e.g. ch1, ch2)
   const chMatch = level.variantId.match(/ch(\d+)/);
   if (chMatch) {
     const chapterIdx = parseInt(chMatch[1], 10);
@@ -170,6 +170,6 @@ export const findVariantForLevel = (
     if (found) return found;
   }
 
-  // 3. Fallback al primer variant si existe
+  // 3. Fallback to first Vienna or any variant
   return allVariants.find(v => v.id.includes('vienna') || v.openingName.includes('Vienna')) || allVariants[0];
 };
