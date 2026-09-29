@@ -14,6 +14,7 @@ export interface OpeningVariant {
   moves: MoveNode[]; // Ordered array of moves in this line
   chapterName?: string; // Optional chapter name for grouped repertoires
   chapterIndex?: number; // Optional chapter index
+  isCustom?: boolean; // True if loaded via user PGN import
 }
 
 export interface UserProgress {
@@ -22,4 +23,21 @@ export interface UserProgress {
   successes: number; // Total successful practice runs (no mistakes)
   demoCompleted: boolean; // Whether the user has completed the guided demonstration
   lastTrained: string; // ISO date string of the last session
+  // Spaced Repetition (SRS)
+  repetitions?: number; // Consecutive successful practice sessions
+  intervalDays?: number; // Current interval in days until next review
+  easeFactor?: number; // SRS ease multiplier (default 2.5)
+  nextReviewDate?: string; // ISO date string when review is due
 }
+
+export type BoardThemeId = 'sepia' | 'wood' | 'green' | 'blue';
+
+export interface BoardThemeConfig {
+  id: BoardThemeId;
+  name: string;
+  lightSquare: string;
+  darkSquare: string;
+}
+
+export type AppView = 'menu' | 'vienna-directory' | 'changelog';
+export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs';

@@ -1,201 +1,61 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Chess } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
-import {
-  BookOpen,
-  Award,
-  RotateCcw,
-  Play,
-  ArrowLeft,
-  CheckCircle2,
-  Sun,
-  Moon,
-  Compass,
-  Zap,
-  Info,
-  Search,
-  ChevronDown
-} from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Chess, Square, Move } from 'chess.js';
 import { OPENING_VARIANTS } from './data/openings';
-import { OpeningVariant, UserProgress, MoveNode } from './types';
+import {
+  OpeningVariant,
+  UserProgress,
+  AppView,
+  PlaylistMode,
+  BoardThemeId
+} from './types';
+import { parsePgnFile, convertPgnToVariants } from './utils/pgnParser';
+import { soundManager } from './utils/sound';
+import { calculateNextSrsProgress, getDueVariants } from './utils/srs';
+import { BOARD_THEMES } from './utils/boardThemes';
 
-// --- PGN Parser Helpers ---
-interface PgnHeaders {
-  [key: string]: string;
-}
-
-interface ParsedPgnGame {
-  headers: PgnHeaders;
-  movesText: string;
-}
-
-// Splits PGN string into individual game/chapter blocks
-const parsePgnFile = (pgnString: string): ParsedPgnGame[] => {
-  const games: ParsedPgnGame[] = [];
-  // Split games by standard PGN event header block
-  const gameStrings = pgnString.split(/\n(?=\[Event )/g);
-
-  for (const gameStr of gameStrings) {
-    if (!gameStr.trim()) continue;
-
-    const headers: PgnHeaders = {};
-    const headerRegex = /\[(\w+)\s+"([^"]*)"\]/g;
-    let match;
-    while ((match = headerRegex.exec(gameStr)) !== null) {
-      headers[match[1]] = match[2];
-    }
-
-    // Extract moves text (everything after headers)
-    const movesText = gameStr.replace(/\[[^\]]*\]/g, '').trim();
-    if (movesText) {
-      games.push({ headers, movesText });
-    }
-  }
-
-  return games;
-};
-
-// Recursive backtracking parser to extract all unique branches/subvariations
-const parsePgnToLines = (movesText: string): MoveNode[][] => {
-  // 1. Remove Lichess eval and graphical tags like [%eval 0.25] or [%cal Ga2a3]
-  const cleanText = movesText.replace(/\[%[^\]]*\]/g, '');
-  
-  const lines: MoveNode[][] = [];
-  
-  const recurse = (text: string, currentPath: MoveNode[], tempChess: Chess) => {
-    let index = 0;
-    const tokens = text.match(/(\(|\)|\{[^}]*\}|\d+\.+\s*|[a-zA-Z0-9#+=x-]+)/g) || [];
-    
-    const localChess = new Chess(tempChess.fen());
-    const localPath = [...currentPath];
-    
-    while (index < tokens.length) {
-      const token = tokens[index].trim();
-      index++;
-      
-      if (!token || /^\d+\.+/.test(token) || token === '*' || token === '1-0' || token === '0-1' || token === '1/2-1/2') {
-        continue;
-      }
-      
-      if (token.startsWith('{')) {
-        // Comment for the last move
-        const comment = token.slice(1, -1).trim();
-        if (localPath.length > 0 && comment) {
-          localPath[localPath.length - 1].comment = comment;
-        }
-        continue;
-      }
-      
-      if (token === '(') {
-        // A branch starts! Find matching closing parenthesis
-        let depth = 1;
-        const branchStart = index;
-        while (index < tokens.length && depth > 0) {
-          if (tokens[index].trim() === '(') depth++;
-          if (tokens[index].trim() === ')') depth--;
-          index++;
-        }
-        
-        const branchTokens = tokens.slice(branchStart, index - 1);
-        const branchText = branchTokens.join(' ');
-        
-        // The branch is an alternative to the LAST move in localPath
-        if (localPath.length > 0) {
-          const parentPath = localPath.slice(0, -1);
-          const parentChess = new Chess();
-          for (const m of parentPath) {
-            parentChess.move({ from: m.from, to: m.to, promotion: 'q' });
-          }
-          
-          recurse(branchText, parentPath, parentChess);
-        }
-        continue;
-      }
-      
-      if (token === ')') {
-        continue;
-      }
-      
-      // It is a standard move
-      try {
-        const move = localChess.move(token);
-        if (move) {
-          let comment: string | undefined = undefined;
-          if (index < tokens.length && tokens[index].trim().startsWith('{')) {
-            comment = tokens[index].trim().slice(1, -1).trim();
-            index++;
-          }
-          
-          localPath.push({
-            from: move.from,
-            to: move.to,
-            notation: move.san,
-            comment: comment || undefined
-          });
-        }
-      } catch (err) {
-        console.warn(`Skipping invalid move token "${token}":`, err);
-        break;
-      }
-    }
-    
-    if (localPath.length > 0) {
-      lines.push(localPath);
-    }
-  };
-  
-  recurse(cleanText, [], new Chess());
-  return lines;
-};
-
-// Converts a parsed PGN game block to our OpeningVariant format (extracting all unique paths)
-const convertPgnToVariants = (chapterIndex: number, game: ParsedPgnGame): OpeningVariant[] => {
-  const event = game.headers['Event'] || game.headers['ChapterName'] || `Chapter ${chapterIndex}`;
-  const side = (game.headers['Side'] || 'white').toLowerCase() as 'white' | 'black';
-  const description = game.headers['Description'] || `Practice the ${event}.`;
-
-  const lines = parsePgnToLines(game.movesText);
-  const variants: OpeningVariant[] = [];
-
-  lines.forEach((moves, lineIndex) => {
-    if (moves.length === 0) return;
-
-    let variantName = event;
-    if (lines.length > 1) {
-      if (lineIndex === 0) {
-        variantName = `Main Line`;
-      } else {
-        const lastMove = moves[moves.length - 1];
-        variantName = `var. ${lastMove.notation}`;
-      }
-    } else {
-      variantName = `Main Line`;
-    }
-
-    variants.push({
-      id: `vienna-pgn-ch${chapterIndex}-line${lineIndex}`,
-      openingName: 'Vienna Repertoire',
-      name: variantName,
-      description,
-      side,
-      moves,
-      chapterName: event,
-      chapterIndex
-    });
-  });
-
-  return variants;
-};
+// Modular UI Components
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import { VersionWidget } from './components/VersionWidget';
+import { MainMenuView } from './components/MainMenuView';
+import { ViennaDirectory } from './components/ViennaDirectory';
+import { TrainingView } from './components/TrainingView';
+import { ChangelogView } from './components/ChangelogView';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { BoardThemeSelectorModal } from './components/BoardThemeSelectorModal';
+import { ImportPgnModal } from './components/ImportPgnModal';
 
 function App() {
-  // --- Available Variants State ---
+  // --- Repertoire State ---
   const [variants, setVariants] = useState<OpeningVariant[]>(OPENING_VARIANTS);
-  const [activeView, setActiveView] = useState<'menu' | 'vienna-directory' | 'changelog'>('menu');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [expandedChapters, setExpandedChapters] = useState<{ [key: string]: boolean }>({});
+  const [customVariants, setCustomVariants] = useState<OpeningVariant[]>(() => {
+    try {
+      const saved = localStorage.getItem('chessop_custom_variants');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
-  // --- Navigation & Theme State ---
-  const [currentVariant, setCurrentVariant] = useState<OpeningVariant | null>(null);
+  // --- Navigation & View State ---
+  const [activeView, setActiveView] = useState<AppView>('menu');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
+
+  // --- Modals State ---
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
+
+  // --- Board Theme & Sound State ---
+  const [boardThemeId, setBoardThemeId] = useState<BoardThemeId>(() => {
+    const saved = localStorage.getItem('chessop_board_theme') as BoardThemeId;
+    return saved && BOARD_THEMES[saved] ? saved : 'sepia';
+  });
+
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => soundManager.isEnabled());
+
+  // --- Light / Dark Theme ---
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('chessop_theme');
     if (saved === 'dark' || saved === 'light') return saved;
@@ -203,12 +63,13 @@ function App() {
   });
 
   // --- User Progress State ---
-  const [userProgress, setUserProgress] = useState<{ [variantId: string]: UserProgress }>(() => {
+  const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>(() => {
     const saved = localStorage.getItem('chessop_progress');
     return saved ? JSON.parse(saved) : {};
   });
 
   // --- Training Loop State ---
+  const [currentVariant, setCurrentVariant] = useState<OpeningVariant | null>(null);
   const game = useRef<Chess>(new Chess());
   const [gameFen, setGameFen] = useState<string>('start');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -219,7 +80,7 @@ function App() {
   const [lastMoveComment, setLastMoveComment] = useState<string | null>(null);
   const [completedVariantsThisSession, setCompletedVariantsThisSession] = useState<string[]>([]);
   const [showUnpopularChapters, setShowUnpopularChapters] = useState<boolean>(false);
-  const [playlistMode, setPlaylistMode] = useState<'none' | 'rumble' | 'study'>('none');
+  const [playlistMode, setPlaylistMode] = useState<PlaylistMode>('none');
   const [playlistQueue, setPlaylistQueue] = useState<OpeningVariant[]>([]);
   const [playlistOriginalSize, setPlaylistOriginalSize] = useState<number>(0);
   const [playlistIndex, setPlaylistIndex] = useState<number>(0);
@@ -229,13 +90,11 @@ function App() {
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
   const [maxReachedIndex, setMaxReachedIndex] = useState<number>(0);
 
-  // --- Load Dynamic PGN File on Startup ---
+  // --- Load Dynamic PGN on Startup ---
   useEffect(() => {
     fetch('/vienna.pgn')
       .then(response => {
-        if (!response.ok) {
-          throw new Error('No custom vienna.pgn found');
-        }
+        if (!response.ok) throw new Error('No custom vienna.pgn found');
         return response.text();
       })
       .then(text => {
@@ -248,14 +107,16 @@ function App() {
         });
 
         if (parsedVariants.length > 0) {
-          // Merge default hardcoded variants with dynamically parsed PGN variants
-          setVariants([...OPENING_VARIANTS, ...parsedVariants]);
+          setVariants(prev => {
+            const defaults = prev.filter(v => v.openingName !== 'Vienna Repertoire' && !v.isCustom);
+            return [...defaults, ...parsedVariants, ...customVariants];
+          });
         }
       })
       .catch(err => {
         console.log('Using default opening variations (no custom public/vienna.pgn loaded):', err);
       });
-  }, []);
+  }, [customVariants]);
 
   // --- Theme Sync Effect ---
   useEffect(() => {
@@ -268,18 +129,40 @@ function App() {
     localStorage.setItem('chessop_theme', theme);
   }, [theme]);
 
-  // --- Initialize / Load an Opening Variant ---
-  const startVariant = (variant: OpeningVariant, demoOverride?: boolean) => {
-    // Initialize a fresh clean chess.js instance
+  // --- Board Theme Sync ---
+  const handleSelectBoardTheme = (id: BoardThemeId) => {
+    setBoardThemeId(id);
+    localStorage.setItem('chessop_board_theme', id);
+  };
+
+  // --- Sound Toggle ---
+  const handleToggleSound = () => {
+    const next = soundManager.toggle();
+    setSoundEnabled(next);
+  };
+
+  // --- Sound Dispatcher Helper ---
+  const playMoveAudioFeedback = (chessInstance: Chess, isCaptureMove: boolean) => {
+    if (chessInstance.inCheck()) {
+      soundManager.playCheck();
+    } else if (isCaptureMove) {
+      soundManager.playCapture();
+    } else {
+      soundManager.playMove();
+    }
+  };
+
+  const makeRivalMoveRef = useRef<((index: number, variant: OpeningVariant, chessInstance: Chess) => void) | null>(null);
+
+  // --- Start / Load an Opening Variant ---
+  const startVariant = useCallback((variant: OpeningVariant, demoOverride?: boolean) => {
     const chessInstance = new Chess();
     game.current = chessInstance;
 
-    // Reset session completions if starting a different chapter
     if (!currentVariant || currentVariant.chapterName !== variant.chapterName) {
       setCompletedVariantsThisSession([]);
     }
     
-    // Determine whether we should start in Demo Mode
     const progress = userProgress[variant.id];
     const shouldStartDemo = demoOverride ?? !(progress?.demoCompleted ?? false);
     
@@ -301,25 +184,27 @@ function App() {
     );
     setLastMoveComment(variant.description);
 
-    // If the user plays as Black, the machine must make White's first move immediately
     if (variant.side === 'black') {
       setTimeout(() => {
-        makeRivalMove(0, variant, chessInstance);
+        makeRivalMoveRef.current?.(0, variant, chessInstance);
       }, 500);
     }
-  };
+  }, [currentVariant, userProgress]);
 
-  // --- Make Opponent Move ---
+  // --- Make Rival Move ---
   const makeRivalMove = (index: number, variant: OpeningVariant, chessInstance: Chess) => {
     const rivalMove = variant.moves[index];
     if (!rivalMove) return;
 
     try {
+      const isCapture = !!chessInstance.get(rivalMove.to as Square);
       chessInstance.move({
         from: rivalMove.from,
         to: rivalMove.to,
-        promotion: 'q' // auto-promote to queen for simplicity
+        promotion: 'q'
       });
+
+      playMoveAudioFeedback(chessInstance, isCapture);
 
       const nextIndex = index + 1;
       setCurrentIndex(nextIndex);
@@ -331,7 +216,6 @@ function App() {
         setLastMoveComment(rivalMove.comment);
       }
 
-      // Check if this move finishes the variation
       if (nextIndex >= variant.moves.length) {
         completeTraining(variant, true);
       }
@@ -339,15 +223,15 @@ function App() {
       console.error('Error making rival move:', err);
     }
   };
+  makeRivalMoveRef.current = makeRivalMove;
 
-  // --- Drag & Drop Handler (API v4 Signature) ---
+  // --- Drag & Drop Handler ---
   const handlePieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
     if (!currentVariant || isCompleted || boardError) return false;
 
     const expectedMove = currentVariant.moves[currentIndex];
     if (!expectedMove) return false;
 
-    // Validate if it is the user's turn to move based on their selected side
     const isUserTurn = currentVariant.side === 'white'
       ? currentIndex % 2 === 0
       : currentIndex % 2 === 1;
@@ -357,26 +241,21 @@ function App() {
     let actualVariant = currentVariant;
     let actualExpectedMove = expectedMove;
 
-    // Check if source and target squares match the expected move
     if (sourceSquare !== expectedMove.from || targetSquare !== expectedMove.to) {
-      // Look for alternative variation in the same chapter that matches the played path + this move
       const alternativeVariant = variants.find(v => {
         if (v.chapterName !== currentVariant.chapterName || v.id === currentVariant.id) return false;
         if (v.moves.length <= currentIndex) return false;
         
-        // Match history
         for (let i = 0; i < currentIndex; i++) {
           if (v.moves[i].from !== currentVariant.moves[i].from || v.moves[i].to !== currentVariant.moves[i].to) {
             return false;
           }
         }
         
-        // Match new move
         return v.moves[currentIndex].from === sourceSquare && v.moves[currentIndex].to === targetSquare;
       });
 
       if (alternativeVariant) {
-        // Yes! Switch to the alternative variation dynamically
         actualVariant = alternativeVariant;
         actualExpectedMove = alternativeVariant.moves[currentIndex];
         setCurrentVariant(alternativeVariant);
@@ -388,7 +267,7 @@ function App() {
     }
 
     try {
-      // Make the move on chess.js
+      const isCapture = !!game.current.get(targetSquare as Square);
       const move = game.current.move({
         from: sourceSquare,
         to: targetSquare,
@@ -400,7 +279,8 @@ function App() {
         return false;
       }
 
-      // Correct move: Update states
+      playMoveAudioFeedback(game.current, isCapture);
+
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
       setMaxReachedIndex(prev => Math.max(prev, nextIndex));
@@ -411,15 +291,12 @@ function App() {
         setLastMoveComment(actualExpectedMove.comment);
       }
 
-      // Reset selection and options highlights on move completion
       setSelectedSquare(null);
       setOptionSquares({});
 
-      // Check if the line has been completed
       if (nextIndex >= actualVariant.moves.length) {
         completeTraining(actualVariant, true);
       } else {
-        // Trigger automatic opponent response after 400ms
         setTimeout(() => {
           makeRivalMove(nextIndex, actualVariant, game.current);
         }, 400);
@@ -436,7 +313,6 @@ function App() {
   const handleSquareClick = (square: string) => {
     if (!currentVariant || isCompleted || boardError) return;
 
-    // Validate if it is the user's turn to move based on their selected side
     const isUserTurn = currentVariant.side === 'white'
       ? currentIndex % 2 === 0
       : currentIndex % 2 === 1;
@@ -444,35 +320,29 @@ function App() {
     if (!isUserTurn) return;
 
     if (selectedSquare) {
-      // If we click on the same square, deselect it
       if (selectedSquare === square) {
         setSelectedSquare(null);
         setOptionSquares({});
         return;
       }
 
-      // Try to execute the move!
       const success = handlePieceDrop(selectedSquare, square);
       if (success) {
-        // Move made successfully! Clear selection
         setSelectedSquare(null);
         setOptionSquares({});
         return;
       }
     }
 
-    // If move was not made, let's see if we clicked a piece of our color to select it
-    const piece = game.current.get(square as any);
+    const piece = game.current.get(square as Square);
     const expectedColor = currentVariant.side === 'white' ? 'w' : 'b';
 
     if (piece && piece.color === expectedColor) {
       setSelectedSquare(square);
-
-      // Get possible moves for highlight
-      const rawMoves = game.current.moves({ square: square as any, verbose: true }) as any[];
+      const rawMoves = game.current.moves({ square: square as Square, verbose: true });
       const highlightSquares: Record<string, React.CSSProperties> = {};
       
-      rawMoves.forEach((m) => {
+      rawMoves.forEach((m: Move) => {
         const targetPiece = game.current.get(m.to);
         highlightSquares[m.to] = {
           background: targetPiece
@@ -490,12 +360,10 @@ function App() {
   };
 
   // --- Move Navigation Handlers (Undo / Redo) ---
-  const handleNavigateBackward = () => {
+  const handleNavigateBackward = useCallback(() => {
     if (!currentVariant || currentIndex <= 0 || boardError) return;
 
     const newIndex = currentIndex - 1;
-    
-    // Reconstruct the game state up to newIndex
     const tempChess = new Chess();
     for (let i = 0; i < newIndex; i++) {
       try {
@@ -511,12 +379,10 @@ function App() {
     game.current = tempChess;
     setGameFen(tempChess.fen());
     setCurrentIndex(newIndex);
-    
-    // Clear selection highlights
     setSelectedSquare(null);
     setOptionSquares({});
+    soundManager.playMove();
     
-    // Update commentator text
     if (newIndex === 0) {
       setLastMoveComment(currentVariant.description);
     } else {
@@ -525,26 +391,27 @@ function App() {
         setLastMoveComment(lastMove.comment);
       }
     }
-  };
+  }, [currentVariant, currentIndex, boardError]);
 
-  const handleNavigateForward = () => {
+  const handleNavigateForward = useCallback(() => {
     if (!currentVariant || currentIndex >= maxReachedIndex || boardError) return;
 
     const nextMove = currentVariant.moves[currentIndex];
     if (!nextMove) return;
 
     try {
+      const isCapture = !!game.current.get(nextMove.to as Square);
       game.current.move({
         from: nextMove.from,
         to: nextMove.to,
         promotion: 'q'
       });
       
+      playMoveAudioFeedback(game.current, isCapture);
+
       const newIndex = currentIndex + 1;
       setGameFen(game.current.fen());
       setCurrentIndex(newIndex);
-      
-      // Clear selection highlights
       setSelectedSquare(null);
       setOptionSquares({});
       
@@ -554,15 +421,15 @@ function App() {
     } catch (err) {
       console.error('Error executing forward navigation move:', err);
     }
-  };
+  }, [currentVariant, currentIndex, maxReachedIndex, boardError]);
 
-  // --- Visual Error Feedback ---
+  // --- Visual & Acoustic Error Feedback ---
   const triggerErrorFeedback = () => {
     setBoardError(true);
     setFeedbackMessage('Incorrect move. Try again!');
     setConsecutiveMistakes(prev => prev + 1);
+    soundManager.playError();
     
-    // Clear selection highlights on mistake to keep the UI clean
     setSelectedSquare(null);
     setOptionSquares({});
     
@@ -571,9 +438,25 @@ function App() {
     }, 800);
   };
 
+  // --- Trigger Move Hint ---
+  const triggerHint = useCallback(() => {
+    if (!currentVariant || isCompleted) return;
+    const expectedMove = currentVariant.moves[currentIndex];
+    if (!expectedMove) return;
+
+    setShowHintArrow(true);
+    setFeedbackMessage(`Hint: The next move is ${expectedMove.notation}!`);
+    soundManager.playCheck();
+    
+    setTimeout(() => {
+      setShowHintArrow(false);
+    }, 2500);
+  }, [currentVariant, isCompleted, currentIndex]);
+
   // --- Handle Successful Training Run ---
   const completeTraining = (variant: OpeningVariant, success: boolean) => {
-    // Save progress stats to localStorage
+    soundManager.playVictory();
+
     const currentProg = userProgress[variant.id] || {
       variantId: variant.id,
       attempts: 0,
@@ -586,12 +469,19 @@ function App() {
     const newSuccesses = success && !isDemoMode ? currentProg.successes + 1 : currentProg.successes;
     const newDemoCompleted = isDemoMode ? true : currentProg.demoCompleted;
 
+    // Calculate Spaced Repetition (SRS) metrics
+    const srsUpdates = !isDemoMode
+      ? calculateNextSrsProgress(currentProg, consecutiveMistakes === 0)
+      : {};
+
     const newProgress: UserProgress = {
+      ...currentProg,
       variantId: variant.id,
       attempts: newAttempts,
       successes: newSuccesses,
       demoCompleted: newDemoCompleted,
-      lastTrained: new Date().toISOString()
+      lastTrained: new Date().toISOString(),
+      ...srsUpdates
     };
 
     const updatedProgress = {
@@ -602,14 +492,16 @@ function App() {
     setUserProgress(updatedProgress);
     localStorage.setItem('chessop_progress', JSON.stringify(updatedProgress));
 
-    // Handle transition / victory state
+    // Handle transition in playlist modes
     if (playlistMode !== 'none') {
       const nextIdx = playlistIndex + 1;
       if (nextIdx < playlistQueue.length) {
         setPlaylistIndex(nextIdx);
         const nextVar = playlistQueue[nextIdx];
         const transitionText = playlistMode === 'rumble'
-          ? `Rumble variation completed! Loading next chapter challenge: ${nextVar.chapterName}...`
+          ? `Rumble line conquered! Loading next chapter: ${nextVar.chapterName}...`
+          : playlistMode === 'srs'
+          ? `Memory review passed! Next due variation loading...`
           : `Main line completed! Loading next main study line: ${nextVar.chapterName}...`;
         
         setFeedbackMessage(transitionText);
@@ -620,8 +512,10 @@ function App() {
       } else {
         setIsCompleted(true);
         const victoryText = playlistMode === 'rumble'
-          ? 'Rumble Challenge Conquered! You completed a variation from all 11 principal chapters!'
-          : 'Study Repertoire Mastered! You completed the Main Lines of all 11 principal chapters!';
+          ? 'Rumble Challenge Conquered! Mastered a line from all 11 principal chapters!'
+          : playlistMode === 'srs'
+          ? 'Daily Spaced Repetition Review Complete! Your memory is razor-sharp!'
+          : 'Study Repertoire Mastered! Completed the Main Lines of all 11 principal chapters!';
         setFeedbackMessage(victoryText);
         setPlaylistMode('none');
         return;
@@ -631,15 +525,11 @@ function App() {
     if (variant.chapterName) {
       const chapter = chapters.find(ch => ch.title === variant.chapterName);
       if (chapter && chapter.variants.length > 1) {
-        // Track session completion
         const nextCompleted = [...completedVariantsThisSession, variant.id];
         setCompletedVariantsThisSession(nextCompleted);
-
-        // Check if all variants in the chapter are completed
         const allCompleted = chapter.variants.every(v => nextCompleted.includes(v.id));
 
         if (!allCompleted) {
-          // Find the next uncompleted variant
           const nextUncompleted = chapter.variants.find(v => !nextCompleted.includes(v.id));
           if (nextUncompleted) {
             setFeedbackMessage(`Line completed! Auto-loading next variation: ${nextUncompleted.name}...`);
@@ -652,13 +542,12 @@ function App() {
       }
     }
 
-    // Default: Show the final victory completion screen for the chapter
     setIsCompleted(true);
     setFeedbackMessage('Chapter completed successfully!');
   };
 
-  // --- Return to Menu ---
-  const resetToMenu = () => {
+  // --- Reset to Menu ---
+  const resetToMenu = useCallback(() => {
     setCurrentVariant(null);
     setIsCompleted(false);
     setLastMoveComment(null);
@@ -667,28 +556,12 @@ function App() {
     setSelectedSquare(null);
     setOptionSquares({});
     setMaxReachedIndex(0);
-  };
+    setActiveView('menu');
+  }, []);
 
-  // --- Trigger Move Hint ---
-  const triggerHint = () => {
-    if (!currentVariant || isCompleted) return;
-    const expectedMove = currentVariant.moves[currentIndex];
-    if (!expectedMove) return;
-
-    setShowHintArrow(true);
-    setFeedbackMessage(`Hint: The next move is ${expectedMove.notation}!`);
-    
-    // Clear hint arrow after 2.5 seconds
-    setTimeout(() => {
-      setShowHintArrow(false);
-    }, 2500);
-  };
-
-  // --- Get Demonstration Guide Arrow (react-chessboard v4 double array shape) ---
+  // --- Demonstration Guide Arrow ---
   const getDemoArrows = (): string[][] | undefined => {
     if (!currentVariant || isCompleted) return undefined;
-    
-    // Draw arrow in Demo Mode or when Hint is active
     if (!isDemoMode && !showHintArrow) return undefined;
 
     const expectedMove = currentVariant.moves[currentIndex];
@@ -707,15 +580,18 @@ function App() {
   const totalSuccesses = Object.values(userProgress).reduce((acc, curr) => acc + curr.successes, 0);
   const masteredOpenings = Object.values(userProgress).filter(p => p.successes > 0).length;
 
-  // Group Vienna Variations for filtering stats
   const viennaVariants = useMemo(() => {
     return variants.filter(v => v.openingName === 'Vienna Repertoire');
   }, [variants]);
   
-  // Stats specifically for Vienna Repertoire
   const viennaAttempts = viennaVariants.reduce((acc, curr) => acc + (userProgress[curr.id]?.attempts || 0), 0);
   const viennaSuccesses = viennaVariants.reduce((acc, curr) => acc + (userProgress[curr.id]?.successes || 0), 0);
   const viennaMastered = viennaVariants.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
+
+  // Due variants for Spaced Repetition (SRS)
+  const dueVariants = useMemo(() => {
+    return getDueVariants(variants, userProgress);
+  }, [variants, userProgress]);
 
   // Dynamically group variants into Chapters
   const chapters = useMemo(() => {
@@ -729,8 +605,7 @@ function App() {
       chapterIndex?: number;
     }[] = [];
 
-    // A. Group default variants
-    const defaultVariants = variants.filter(v => v.openingName !== 'Vienna Repertoire');
+    const defaultVariants = variants.filter(v => v.openingName !== 'Vienna Repertoire' && !v.isCustom);
     defaultVariants.forEach(v => {
       list.push({
         id: v.id,
@@ -742,8 +617,7 @@ function App() {
       });
     });
 
-    // B. Group Vienna variants by chapterName
-    const viennaGroups: { [key: string]: OpeningVariant[] } = {};
+    const viennaGroups: Record<string, OpeningVariant[]> = {};
     viennaVariants.forEach(v => {
       const chName = v.chapterName || 'General Repertoire';
       if (!viennaGroups[chName]) {
@@ -752,10 +626,8 @@ function App() {
       viennaGroups[chName].push(v);
     });
 
-    // Convert Vienna groups to chapters, sorted by chapterIndex
     const viennaChaptersList = Object.keys(viennaGroups).map(chName => {
       const groupVariants = viennaGroups[chName];
-      // Sort variants: Main Line (lineIndex 0) is first
       const sortedGroup = [...groupVariants].sort((a, b) => {
         const aIdx = parseInt(a.id.split('-line')[1]) || 0;
         const bIdx = parseInt(b.id.split('-line')[1]) || 0;
@@ -773,18 +645,15 @@ function App() {
       };
     });
 
-    // Sort Vienna chapters by chapterIndex
     viennaChaptersList.sort((a, b) => (a.chapterIndex || 0) - (b.chapterIndex || 0));
 
     return [...list, ...viennaChaptersList];
   }, [variants, viennaVariants]);
 
-  // Extract default and Vienna chapters specifically
   const defaultChapters = useMemo(() => {
     return chapters.filter(ch => ch.category === 'Default Repertoire');
   }, [chapters]);
 
-  // Curated list of popular theoretical chapters
   const popularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
       "Vienna Gambit: Accepted",
@@ -810,7 +679,6 @@ function App() {
     return [...popularList].sort((a, b) => getViennaUtilityScore(a.title) - getViennaUtilityScore(b.title));
   }, [chapters]);
 
-  // Rest of the chapters in the study (not so popular)
   const unpopularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
       "Vienna Gambit: Accepted",
@@ -835,25 +703,6 @@ function App() {
     return [...unpopularList].sort((a, b) => (a.chapterIndex || 0) - (b.chapterIndex || 0));
   }, [chapters]);
 
-  // Filter popular Vienna chapters based on search query
-  const filteredPopularChapters = useMemo(() => {
-    const query = searchQuery.toLowerCase();
-    return popularViennaChapters.filter(ch =>
-      ch.title.toLowerCase().includes(query) ||
-      ch.description.toLowerCase().includes(query)
-    );
-  }, [popularViennaChapters, searchQuery]);
-
-  // Filter unpopular Vienna chapters based on search query
-  const filteredUnpopularChapters = useMemo(() => {
-    const query = searchQuery.toLowerCase();
-    return unpopularViennaChapters.filter(ch =>
-      ch.title.toLowerCase().includes(query) ||
-      ch.description.toLowerCase().includes(query)
-    );
-  }, [unpopularViennaChapters, searchQuery]);
-
-  // Find the next variation in the same chapter if any
   const nextVariantInChapter = useMemo(() => {
     if (!currentVariant || !currentVariant.chapterName) return null;
     const chapter = chapters.find(ch => ch.title === currentVariant.chapterName);
@@ -865,11 +714,9 @@ function App() {
     return null;
   }, [currentVariant, chapters]);
 
-  // --- Start Rumble Challenge Mode ---
+  // --- Playlist Actions ---
   const startRumbleChallenge = () => {
     if (popularViennaChapters.length === 0) return;
-
-    // Collect the Main Line (variants[0]) of each popular chapter
     const mainLines: OpeningVariant[] = [];
     popularViennaChapters.forEach(chapter => {
       if (chapter.variants.length > 0) {
@@ -877,23 +724,16 @@ function App() {
       }
     });
 
-    // Shuffle the main lines to make it a true "rumble" challenge
     const shuffled = [...mainLines].sort(() => Math.random() - 0.5);
-
     setPlaylistMode('rumble');
     setPlaylistQueue(shuffled);
     setPlaylistOriginalSize(shuffled.length);
     setPlaylistIndex(0);
-
-    // Start training the first random variation in Practice Mode (demoOverride = false since it is a challenge!)
     startVariant(shuffled[0], false);
   };
 
-  // --- Start Study Main Lines Mode ---
   const startStudyMainLines = () => {
     if (popularViennaChapters.length === 0) return;
-
-    // Collect the Main Line (variants[0]) of each popular chapter in their sorted popular order
     const mainLines: OpeningVariant[] = [];
     popularViennaChapters.forEach(chapter => {
       if (chapter.variants.length > 0) {
@@ -905,9 +745,16 @@ function App() {
     setPlaylistQueue(mainLines);
     setPlaylistOriginalSize(mainLines.length);
     setPlaylistIndex(0);
-
-    // Start training the first main line in Demo Mode by default (or practice if preferred, but demo is great for studying)
     startVariant(mainLines[0], true);
+  };
+
+  const startSrsReview = () => {
+    if (dueVariants.length === 0) return;
+    setPlaylistMode('srs');
+    setPlaylistQueue(dueVariants);
+    setPlaylistOriginalSize(dueVariants.length);
+    setPlaylistIndex(0);
+    startVariant(dueVariants[0], false);
   };
 
   const toggleChapterExpand = (chapterId: string) => {
@@ -917,856 +764,269 @@ function App() {
     }));
   };
 
-  const renderChapterCard = (chapter: any) => {
-    const totalSuccesses = chapter.variants.reduce((acc: number, v: any) => acc + (userProgress[v.id]?.successes || 0), 0);
-    const masteredCount = chapter.variants.filter((v: any) => (userProgress[v.id]?.successes || 0) > 0).length;
-    const isAllMastered = masteredCount === chapter.variants.length;
-
-    return (
-      <div
-        key={chapter.id}
-        className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 transition-all duration-200 shadow-sm flex flex-col justify-between hover:shadow relative overflow-hidden animate-fadeIn"
-      >
-        <div className="absolute top-0 right-0 w-16 h-16 bg-brand-primary/5 rounded-full -mr-6 -mt-6 pointer-events-none" />
-        
-        <div className="space-y-3">
-          <div className="flex justify-between items-start gap-2">
-            <div>
-              <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase">
-                Chapter {chapter.chapterIndex} • Vienna Opening
-              </span>
-              <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
-                {chapter.title}
-              </h4>
-            </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-              chapter.side === 'white'
-                ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
-                : 'bg-brand-dark text-white border border-brand-dark'
-            }`}>
-              {chapter.side === 'white' ? 'White' : 'Black'}
-            </span>
-          </div>
-          
-          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[44px]">
-            {chapter.description}
-          </p>
-        </div>
-
-        {/* Chapter Action Details */}
-        <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
-          {chapter.variants.length === 1 ? (
-            /* Case A: Chapter only has 1 line */
-            <div className="flex justify-between items-center gap-4">
-              <div className="flex items-center space-x-2 text-[10px]">
-                {userProgress[chapter.variants[0].id]?.demoCompleted ? (
-                  <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                    <CheckCircle2 size={12} className="mr-0.5" /> Demo OK
-                  </span>
-                ) : (
-                  <span className="text-neutral-450 font-medium flex items-center">
-                    <Info size={12} className="mr-0.5" /> Demo Pending
-                  </span>
-                )}
-                {totalSuccesses > 0 && (
-                  <span className="text-brand-primary font-bold">
-                    {totalSuccesses}x
-                  </span>
-                )}
-              </div>
-
-              <button
-                onClick={() => startVariant(chapter.variants[0])}
-                className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-              >
-                <Play size={12} className="fill-white" /> Train
-              </button>
-            </div>
-          ) : (
-            /* Case B: Chapter has multiple subvariations */
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="text-neutral-400 font-semibold">
-                  {chapter.variants.length} variations • {masteredCount} / {chapter.variants.length} Mastered
-                </span>
-                {isAllMastered && (
-                  <span className="text-green-600 dark:text-green-400 font-bold flex items-center">
-                    <Award size={12} className="mr-0.5" /> Mastered!
-                  </span>
-                )}
-              </div>
-
-              <div className="flex justify-between items-center gap-2 pt-1">
-                <button
-                  onClick={() => startVariant(chapter.variants[0])}
-                  className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center gap-1 cursor-pointer font-bold"
-                >
-                  <Play size={12} className="fill-white" /> Train
-                </button>
-                
-                <button
-                  onClick={() => toggleChapterExpand(chapter.id)}
-                  className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-850 text-neutral-600 dark:text-neutral-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
-                >
-                  <span>{expandedChapters[chapter.id] ? 'Hide' : 'Choose Variation'}</span>
-                  <ChevronDown size={14} className={`transition-transform duration-200 ${expandedChapters[chapter.id] ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              {/* Expanded Subvariations List */}
-              {expandedChapters[chapter.id] && (
-                <div className="space-y-2 mt-3 pt-3 border-t border-neutral-150 dark:border-neutral-800/80 animate-fadeIn">
-                  {chapter.variants.map((variant: any) => {
-                    const prog = userProgress[variant.id];
-                    const isDemoDone = prog?.demoCompleted ?? false;
-                    const successes = prog?.successes ?? 0;
-                    return (
-                      <div
-                        key={variant.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-neutral-55 dark:bg-neutral-855 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-100 dark:border-neutral-800/80 transition-all text-[11px]"
-                      >
-                        <div className="space-y-0.5 pr-2 max-w-[70%]">
-                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                            {variant.name}
-                          </div>
-                          <div className="flex gap-2 text-[9px] text-neutral-450 dark:text-neutral-400">
-                            <span>{variant.moves.length} plies</span>
-                            {successes > 0 && <span className="text-brand-primary">{successes}x OK</span>}
-                            {isDemoDone && <span className="text-green-600 dark:text-green-400">Demo OK</span>}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => startVariant(variant)}
-                          className="px-2 py-1 rounded bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
-                        >
-                          <Play size={10} className="fill-white" /> Train
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-      </div>
-    );
+  // --- Custom PGN Import Handlers ---
+  const handleImportCustomPgn = (newVariants: OpeningVariant[]) => {
+    const updated = [...customVariants, ...newVariants];
+    setCustomVariants(updated);
+    localStorage.setItem('chessop_custom_variants', JSON.stringify(updated));
+    setVariants(prev => [...prev, ...newVariants]);
   };
+
+  const handleDeleteCustomRepertoire = (openingName: string) => {
+    if (window.confirm(`Delete "${openingName}" from your repertoires?`)) {
+      const filtered = customVariants.filter(v => v.openingName !== openingName);
+      setCustomVariants(filtered);
+      localStorage.setItem('chessop_custom_variants', JSON.stringify(filtered));
+      setVariants(prev => prev.filter(v => v.openingName !== openingName || !v.isCustom));
+    }
+  };
+
+  // --- Backup & Restore Handlers ---
+  const handleExportProgress = () => {
+    const data = {
+      progress: userProgress,
+      customVariants,
+      theme,
+      boardThemeId,
+      exportedAt: new Date().toISOString(),
+      version: '1.0.2'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chessop_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportProgress = (jsonString: string) => {
+    try {
+      const data = JSON.parse(jsonString);
+      if (data.progress) {
+        setUserProgress(data.progress);
+        localStorage.setItem('chessop_progress', JSON.stringify(data.progress));
+      }
+      if (data.customVariants && Array.isArray(data.customVariants)) {
+        setCustomVariants(data.customVariants);
+        localStorage.setItem('chessop_custom_variants', JSON.stringify(data.customVariants));
+      }
+      alert('Backup restored successfully!');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Invalid format';
+      alert(`Invalid backup JSON: ${message}`);
+    }
+  };
+
+  const handleResetProgress = () => {
+    if (window.confirm('Are you sure you want to reset all training statistics? This cannot be undone.')) {
+      setUserProgress({});
+      localStorage.removeItem('chessop_progress');
+    }
+  };
+
+  // --- Global Keyboard Shortcuts Listener ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when user is typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Close open modals with Esc
+      if (e.key === 'Escape') {
+        if (isThemeModalOpen) {
+          setIsThemeModalOpen(false);
+          return;
+        }
+        if (isImportModalOpen) {
+          setIsImportModalOpen(false);
+          return;
+        }
+        if (isShortcutsModalOpen) {
+          setIsShortcutsModalOpen(false);
+          return;
+        }
+        if (currentVariant) {
+          resetToMenu();
+          return;
+        }
+      }
+
+      // Toggle sound with 'm'
+      if (e.key === 'm' || e.key === 'M') {
+        handleToggleSound();
+        return;
+      }
+
+      // Open shortcuts dialog with '?'
+      if (e.key === '?') {
+        setIsShortcutsModalOpen(true);
+        return;
+      }
+
+      // Training view shortcuts
+      if (currentVariant) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          handleNavigateBackward();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          handleNavigateForward();
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          startVariant(currentVariant, isDemoMode);
+        } else if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          triggerHint();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    currentVariant,
+    isDemoMode,
+    isThemeModalOpen,
+    isImportModalOpen,
+    isShortcutsModalOpen,
+    handleNavigateBackward,
+    handleNavigateForward,
+    startVariant,
+    triggerHint,
+    resetToMenu
+  ]);
 
   return (
     <div className="min-h-screen transition-colors duration-300 bg-brand-bg-light dark:bg-brand-bg-dark text-brand-dark dark:text-brand-secondary flex flex-col justify-between">
-      
       {/* HEADER */}
-      <header className="border-b border-neutral-200 dark:border-neutral-800 py-4 px-6 md:px-12 flex justify-between items-center bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm">
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { resetToMenu(); setActiveView('menu'); setSearchQuery(''); }}>
-          <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            C
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">ChessOp</h1>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Opening Repertoire Trainer</p>
-          </div>
-        </div>
+      <Header
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
+        onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+        onResetToMenu={resetToMenu}
+      />
 
-        <div className="flex items-center space-x-4">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-            title="Toggle Theme"
-            aria-label="Toggle Theme"
-          >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
-          
-          {/* Robust Inline GitHub SVG */}
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
-            title="GitHub Repository"
-          >
-            <svg
-              className="w-5.5 h-5.5 fill-current text-brand-dark dark:text-brand-secondary"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.483 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-            </svg>
-          </a>
-        </div>
-      </header>
-
-      {/* CORE CONTENT */}
+      {/* CORE VIEWPORT */}
       <main className="flex-grow max-w-6xl w-full mx-auto p-6 md:p-8 flex flex-col justify-center">
-        
         {currentVariant ? (
-          /* ================= 1. TRAINING VIEW ================= */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-7xl mx-auto w-full animate-fadeIn">
-            
-            {/* SIDE CONTROL PANEL */}
-            <div className="lg:col-span-4 space-y-6 order-2 lg:order-1 flex flex-col justify-center h-full">
-              
-              {/* Navigation & Header */}
-              <div className="space-y-3">
-                <button
-                  onClick={resetToMenu}
-                  className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer"
-                >
-                  <ArrowLeft size={14} className="mr-1" />
-                  Back to menu
-                </button>
-                
-                <div>
-                  <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
-                    {playlistMode === 'rumble' ? (
-                      <span className="flex items-center gap-1 text-red-500 font-black animate-pulse">
-                        <Zap size={11} className="fill-red-500" /> Rumble Challenge ({playlistIndex + 1} / {playlistOriginalSize})
-                      </span>
-                    ) : playlistMode === 'study' ? (
-                      <span className="flex items-center gap-1 text-brand-primary font-black">
-                        <BookOpen size={11} /> Study Playlist ({playlistIndex + 1} / {playlistOriginalSize})
-                      </span>
-                    ) : (
-                      currentVariant.openingName
-                    )}
-                  </span>
-                  <h3 className="text-xl font-black tracking-tight leading-tight">{currentVariant.chapterName || currentVariant.name}</h3>
-                  {currentVariant.chapterName && (
-                    <span className="text-xs text-neutral-400 font-medium block mt-0.5">{currentVariant.name}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Toggles & Modes */}
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4 shadow-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Side</span>
-                  <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">
-                    Playing as {currentVariant.side === 'white' ? 'White' : 'Black'}
-                  </span>
-                </div>
-
-                <div className="border-t border-neutral-100 dark:border-neutral-800 pt-3">
-                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">Practice Mode</span>
-                  <div className="grid grid-cols-2 gap-2 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
-                    <button
-                      onClick={() => {
-                        setIsDemoMode(true);
-                        startVariant(currentVariant, true);
-                      }}
-                      className={`py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                        isDemoMode 
-                          ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary' 
-                          : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
-                      }`}
-                    >
-                      Demonstration
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDemoMode(false);
-                        startVariant(currentVariant, false);
-                      }}
-                      className={`py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                        !isDemoMode 
-                          ? 'bg-white dark:bg-neutral-700 shadow text-brand-primary' 
-                          : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700'
-                      }`}
-                    >
-                      Practice
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Strategic Commentary */}
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 min-h-[140px] flex flex-col justify-between shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary" />
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center">
-                    <BookOpen size={12} className="mr-1 text-brand-primary" />
-                    Strategic Explanation
-                  </span>
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
-                    {lastMoveComment || 'Make your first move on the board to view strategic explanations.'}
-                  </p>
-                </div>
-
-                <div className="text-xs text-neutral-400 text-right mt-3 font-semibold">
-                  Move {Math.ceil(currentIndex / 2)} / {Math.ceil(currentVariant.moves.length / 2)}
-                </div>
-              </div>
-
-              {/* Restart Button */}
-              <button
-                onClick={() => startVariant(currentVariant, isDemoMode)}
-                className="w-full py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-xs font-bold transition-all flex items-center justify-center space-x-1 shadow-sm active:scale-95 cursor-pointer"
-              >
-                <RotateCcw size={14} className="mr-1" />
-                <span>Restart line</span>
-              </button>
-            </div>
-
-            {/* CHESSBOARD GRAPHIC CONTAINER */}
-            <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col items-center">
-              
-              {/* Minimalist Feedback Banner */}
-              <div className="w-full max-w-[775px] mb-3 text-center transition-all duration-300 min-h-[44px] flex items-center justify-center gap-3">
-                {feedbackMessage && (
-                  <span className={`text-xs font-bold flex items-center px-3 py-1 rounded-full ${
-                    boardError
-                      ? 'bg-red-500/10 text-red-500'
-                      : isCompleted
-                      ? 'bg-green-500/10 text-green-500'
-                      : 'bg-neutral-500/10 text-neutral-500'
-                  }`}>
-                    {boardError && <Zap size={12} className="mr-1 animate-pulse" />}
-                    {isCompleted && <CheckCircle2 size={12} className="mr-1" />}
-                    {feedbackMessage}
-                  </span>
-                )}
-
-                {/* Dynamic Hint Action Button */}
-                {!isDemoMode && !isCompleted && consecutiveMistakes >= 3 && (
-                  <button
-                    onClick={triggerHint}
-                    className="px-5 py-2.5 rounded-xl bg-brand-primary/15 hover:bg-brand-primary/25 text-brand-primary font-black text-xs md:text-sm uppercase tracking-widest transition-all cursor-pointer animate-bounce border-2 border-brand-primary/45 shadow-md flex items-center gap-2 active:scale-95 duration-200"
-                    title="Reveal expected move hint"
-                  >
-                    <span className="text-sm md:text-base">💡</span>
-                    <span>Get Hint</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Dynamic Progress Bar */}
-              <div className="w-full max-w-[775px] mb-4 space-y-1.5 animate-fadeIn">
-                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 dark:text-neutral-450 px-1 tracking-wider">
-                  <span>VARIATION PROGRESS</span>
-                  <span>{currentVariant.moves.length - currentIndex} {currentVariant.moves.length - currentIndex === 1 ? 'move' : 'moves'} remaining</span>
-                </div>
-                <div className="w-full h-2.5 bg-neutral-200 dark:bg-neutral-800/80 rounded-full overflow-hidden border border-neutral-300/10 dark:border-neutral-700/10 shadow-inner">
-                  <div
-                    className="h-full bg-gradient-to-r from-brand-primary/60 via-brand-primary to-brand-primary/95 rounded-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(140,106,92,0.3)]"
-                    style={{ width: `${(currentIndex / currentVariant.moves.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Chessboard container with Error/Success borders */}
-              <div
-                className={`w-full max-w-[775px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border-4 ${
-                  boardError 
-                    ? 'border-red-500/80 scale-[0.99] shake-animation' 
-                    : isCompleted 
-                    ? 'border-green-500/80 scale-[1.01]' 
-                    : 'border-white dark:border-neutral-850'
-                }`}
-              >
-                <Chessboard
-                  position={gameFen}
-                  onPieceDrop={handlePieceDrop}
-                  onSquareClick={handleSquareClick}
-                  customSquareStyles={{
-                    ...optionSquares,
-                    ...(selectedSquare && {
-                      [selectedSquare]: { backgroundColor: 'rgba(140, 106, 92, 0.35)' }
-                    })
-                  }}
-                  boardOrientation={currentVariant.side}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  customArrows={getDemoArrows() as any}
-                  customDarkSquareStyle={{ backgroundColor: 'var(--color-board-dark)' }}
-                  customLightSquareStyle={{ backgroundColor: 'var(--color-board-light)' }}
-                  animationDuration={250}
-                />
-              </div>
-
-              {/* Chessboard Navigation Controls (Backward, Counter, Forward) */}
-              <div className="w-full max-w-[775px] mt-4 flex items-center justify-between bg-white/50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 shadow-sm">
-                <button
-                  onClick={handleNavigateBackward}
-                  disabled={currentIndex <= 0}
-                  className={`flex items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-all active:scale-95 shadow-sm ${
-                    currentIndex <= 0
-                      ? 'opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-neutral-900 text-neutral-400'
-                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-brand-dark dark:text-brand-secondary font-bold'
-                  }`}
-                  title="Step Backward (Undo Move)"
-                  aria-label="Step Backward"
-                >
-                  <ArrowLeft size={16} />
-                </button>
-
-                <div className="text-xs font-black tracking-wider text-neutral-500 uppercase select-none">
-                  PLY {currentIndex} / {currentVariant.moves.length}
-                </div>
-
-                <button
-                  onClick={handleNavigateForward}
-                  disabled={currentIndex >= maxReachedIndex}
-                  className={`flex items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 transition-all active:scale-95 shadow-sm ${
-                    currentIndex >= maxReachedIndex
-                      ? 'opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-neutral-900 text-neutral-400'
-                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-brand-dark dark:text-brand-secondary font-bold'
-                  }`}
-                  title="Step Forward (Redo Move)"
-                  aria-label="Step Forward"
-                >
-                  <ArrowLeft size={16} className="rotate-180" />
-                </button>
-              </div>
-
-              {/* Victory Overlay Panel */}
-              {isCompleted && (
-                <div className="w-full max-w-[775px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl p-4 mt-6 text-center animate-fadeIn shadow-sm">
-                  <h4 className="text-sm font-bold text-green-800 dark:text-green-300 flex items-center justify-center">
-                    <Award size={16} className="mr-1 text-green-600 dark:text-green-400" />
-                    Excellent! You memorized the variation
-                  </h4>
-                  <p className="text-xs text-green-600 dark:text-green-400/80 mt-1">
-                    {isDemoMode 
-                      ? 'You completed the demo. Now try it from memory!' 
-                      : 'Perfect! You have mastered this training block.'
-                    }
-                  </p>
-                  <div className="flex gap-2 justify-center mt-3">
-                    <button
-                      onClick={() => {
-                        if (isDemoMode) {
-                          setIsDemoMode(false);
-                          startVariant(currentVariant, false);
-                        } else {
-                          startVariant(currentVariant, false);
-                        }
-                      }}
-                      className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      {isDemoMode ? 'Try Practice Mode' : 'Practice again'}
-                    </button>
-                    {nextVariantInChapter && (
-                      <button
-                        onClick={() => {
-                          startVariant(nextVariantInChapter, isDemoMode);
-                        }}
-                        className="px-3 py-1 rounded bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        Next Variation
-                      </button>
-                    )}
-                    <button
-                      onClick={resetToMenu}
-                      className="px-3 py-1 rounded bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-700 dark:text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      Back to Menu
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-          </div>
+          <TrainingView
+            currentVariant={currentVariant}
+            gameFen={gameFen}
+            currentIndex={currentIndex}
+            maxReachedIndex={maxReachedIndex}
+            isDemoMode={isDemoMode}
+            isCompleted={isCompleted}
+            boardError={boardError}
+            feedbackMessage={feedbackMessage}
+            lastMoveComment={lastMoveComment}
+            consecutiveMistakes={consecutiveMistakes}
+            playlistMode={playlistMode}
+            playlistIndex={playlistIndex}
+            playlistOriginalSize={playlistOriginalSize}
+            boardTheme={BOARD_THEMES[boardThemeId]}
+            selectedSquare={selectedSquare}
+            optionSquares={optionSquares}
+            nextVariantInChapter={nextVariantInChapter}
+            demoArrows={getDemoArrows()}
+            onPieceDrop={handlePieceDrop}
+            onSquareClick={handleSquareClick}
+            onNavigateBackward={handleNavigateBackward}
+            onNavigateForward={handleNavigateForward}
+            onTriggerHint={triggerHint}
+            onRestartVariant={(demo) => startVariant(currentVariant, demo)}
+            onSwitchMode={(demo) => {
+              setIsDemoMode(demo);
+              startVariant(currentVariant, demo);
+            }}
+            onResetToMenu={resetToMenu}
+            onStartNextVariant={(variant) => startVariant(variant, isDemoMode)}
+            onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+          />
         ) : activeView === 'menu' ? (
-          /* ================= 2. CLEAN MAIN MENU VIEW (Najdorf, Caro-Kann, Berlin, Vienna Card) ================= */
-          <div className="space-y-8 animate-fadeIn">
-            {/* Welcome Banner / Global Stats */}
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
-              <div className="space-y-2 max-w-2xl">
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-primary/10 text-brand-primary">
-                  Memory & Active Recall
-                </span>
-                <h2 className="text-2xl font-bold tracking-tight">Master Your Chess Openings</h2>
-                <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed">
-                  ChessOp helps you absorb chess variations through muscle memory and active recall.
-                  Learn theory with guided visual arrows, then practice completely from memory.
-                </p>
-              </div>
-
-              {/* Quick Stats Panel */}
-              <div className="grid grid-cols-3 gap-4 md:border-l border-neutral-200 dark:border-neutral-800 md:pl-8 min-w-[280px]">
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Attempts</span>
-                  <span className="text-2xl font-bold">{totalAttempts}</span>
-                </div>
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Completed</span>
-                  <span className="text-2xl font-bold">{totalSuccesses}</span>
-                </div>
-                <div className="text-center md:text-left">
-                  <span className="block text-xs text-neutral-400 font-medium">Mastered</span>
-                  <span className="text-2xl font-bold text-brand-primary">{masteredOpenings}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Repertoire Categories & Clean Grid */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-                <Compass size={18} className="text-brand-primary" />
-                Select an Opening Repertoire
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* A. Default Repertoires */}
-                {defaultChapters.map((chapter) => {
-                  const variant = chapter.variants[0];
-                  const progress = userProgress[variant.id];
-                  const hasCompletedDemo = progress?.demoCompleted ?? false;
-                  const practiceCount = progress?.successes ?? 0;
-
-                  return (
-                    <div
-                      key={chapter.id}
-                      className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
-                              {variant.openingName}
-                            </span>
-                            <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${
-                            variant.side === 'white'
-                              ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
-                              : 'bg-brand-dark text-white border border-brand-dark'
-                          }`}>
-                            {variant.side === 'white' ? 'White' : 'Black'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                          {variant.description}
-                        </p>
-                      </div>
-
-                      <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
-                        <div className="flex items-center space-x-3 text-xs">
-                          {hasCompletedDemo ? (
-                            <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                              <CheckCircle2 size={14} className="mr-1" /> Demo OK
-                            </span>
-                          ) : (
-                            <span className="text-neutral-400 font-medium flex items-center">
-                              <Info size={14} className="mr-1" /> Demo Pending
-                            </span>
-                          )}
-
-                          {practiceCount > 0 && (
-                            <span className="text-brand-primary font-semibold">
-                              {practiceCount}x Completed
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => startVariant(variant)}
-                          className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center cursor-pointer"
-                        >
-                          <Play size={12} className="mr-1 fill-white" /> Train
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* B. Vienna Repertoire Card (PREMIUM DYNAMIC CATEGORY LINK) */}
-                {viennaVariants.length > 0 && (
-                  <div
-                    className="bg-white dark:bg-neutral-900 border-2 border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/50 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
-                            Vienna Game
-                          </span>
-                          <h4 className="text-lg font-black tracking-tight mt-0.5">Vienna Opening Repertoire</h4>
-                        </div>
-                        <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                          White
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                        A highly practical and active-recall repertoire for the Vienna Game (1.e4 e5 2.Nc3). Master the signature Vienna Gambit and all major lines using dynamic, chapter-level training.
-                      </p>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
-                      <div className="flex items-center space-x-3 text-xs">
-                        <span className="text-neutral-400 font-medium">
-                          {viennaMastered} / {viennaVariants.length} Mastered
-                        </span>
-                      </div>
-
-                      <button
-                        onClick={() => setActiveView('vienna-directory')}
-                        className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-sm flex items-center cursor-pointer font-bold"
-                      >
-                        <Compass size={12} className="mr-1" /> Choose Chapters
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : activeView === 'changelog' ? (
-          /* ================= 4. SYSTEM CHANGELOG VIEW ================= */
-          <div className="max-w-3xl mx-auto w-full space-y-8 animate-fadeIn">
-            {/* Navigation and Title */}
-            <div>
-              <button
-                onClick={() => { setActiveView('menu'); }}
-                className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer mb-3"
-              >
-                <ArrowLeft size={14} className="mr-1" />
-                Back to Main Menu
-              </button>
-              
-              <h2 className="text-3xl font-extrabold tracking-tight">System Changelog</h2>
-              <p className="text-neutral-500 dark:text-neutral-450 text-sm mt-1">
-                Keep track of updates, optimizations, and new features implemented in ChessOp.
-              </p>
-            </div>
-
-            {/* Version List */}
-            <div className="space-y-8">
-              {/* Version 1.0.1 */}
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
-                
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
-                  <div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                      v1.0.1 • Navigation & Board Scale
-                    </span>
-                    <h3 className="text-2xl font-black mt-2 tracking-tight">Sizing & History Navigation</h3>
-                  </div>
-                  <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
-                    Released: May 26, 2026
-                  </span>
-                </div>
-
-                <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
-                  <p>
-                    This minor release brings significant usability and visual enhancements to help you review lines with maximum ease and visual comfort!
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">↩️ Move History Navigation (Undo & Redo)</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                      <li><strong>Stepping Navigation Arrows</strong>: Effortlessly step backward or forward through the move sequence at any time using the new control buttons right under the chessboard.</li>
-                      <li><strong>History Redo Memory</strong>: Going forward is beautifully restricted to only the plies you have successfully played or seen, ensuring a robust, spoiler-free training flow.</li>
-                      <li><strong>Live Ply Counter</strong>: Renders a tracking badge in the navigation row (e.g., <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">PLY 3 / 10</code>) for precise progress mapping.</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">🔍 Expanded 775px Chessboard</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                      <li><strong>25% Board Scale-up</strong>: Enlarged the primary Chessboard and all sibling containers (feedback banner, progress bar, victory overlay) from <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">620px</code> to <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">775px</code>.</li>
-                      <li><strong>Luxurious Spacious Grid</strong>: Upgraded the central training view wrapper to a massive <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono">max-w-7xl</code> container to offer high-fidelity spacing and premium margins.</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Version 1.0.0 */}
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-12 -mt-12 pointer-events-none" />
-                
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
-                  <div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                      v1.0.0 • Initial Release
-                    </span>
-                    <h3 className="text-2xl font-black mt-2 tracking-tight">The Opening Repertoire Foundation</h3>
-                  </div>
-                  <span className="text-xs text-neutral-450 dark:text-neutral-400 font-semibold md:text-right">
-                    Released: May 26, 2026
-                  </span>
-                </div>
-
-                <div className="space-y-4 text-xs md:text-sm text-neutral-600 dark:text-neutral-350 leading-relaxed">
-                  <p>
-                    Welcome to the first official release of <strong>ChessOp (v1.0.0)</strong>! This system has been designed from the ground up as a high-fidelity opening repertoire memorizer centered around active recall, custom PGN study parsing, and fluid training algorithms.
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">✨ Primary Core Systems</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                      <li><strong>Dynamic Lichess Study PGN Parser</strong>: Processes comprehensive recursive chapter files (RAVs) in real time from <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[11px] font-mono">public/vienna.pgn</code>, converting PGN moves directly into executable training blocks.</li>
-                      <li><strong>Interactive Practice & Demo Loops</strong>: Switch between guided Demo Mode (with visual guiding arrows) and memory-based Practice Mode (validating your moves live on the board).</li>
-                      <li><strong>Dual Input Action Modes</strong>: Play moves concurrently by either drag-and-dropping pieces or using tap-to-move (click piece, click destination).</li>
-                      <li><strong>Dynamic Legal Move Spotlights</strong>: Visualise valid destinations with sepia target dots and capture ring overlays when pieces are pressed.</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">📖 Repertoire Playlist Challenges</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                      <li><strong>Vienna Repertoire Directory</strong>: A clean, sorted chapter catalog dynamically organizing the Vienna Opening in popularity order.</li>
-                      <li><strong>Rumble Challenge Playlist</strong>: Shuffles the main line of the 11 principal popular chapters to test your overall repertoire retention under pressure.</li>
-                      <li><strong>Study Main Lines Playlist</strong>: Practice all 11 popular main lines in order, transitioning automatically from one chapter to the next.</li>
-                      <li><strong>Live Training HUD</strong>: Shows a dynamic progress badge tracking your active playlist tracks.</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-neutral-850 dark:text-neutral-200 uppercase tracking-wide text-xs">💡 Active Recall & UI Polish</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                      <li><strong>Bouncing Get Hint Trigger</strong>: Appears automatically after 3 consecutive mistakes. Clicking it reveals coordinate messages and draws guiding arrows on the board.</li>
-                      <li><strong>Adaptive Practice Branching</strong>: Switches active variation branches on the fly if a sideline of the same chapter is played.</li>
-                      <li><strong>Collapsible Sidelines Drawer</strong>: Sidelines beyond the top 11 chapters are elegantly hidden in a collapsible grid drawer labeled "Not so popular variations".</li>
-                      <li><strong>Curated Earth-Sepia Aesthetic</strong>: High-end layout with warm sepia elements, dark/light theme syncing, responsive Chessboard scaling to <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[11px] font-mono">620px</code>, and custom victory overlays.</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <MainMenuView
+            defaultChapters={defaultChapters}
+            viennaVariants={viennaVariants}
+            customVariants={customVariants}
+            dueVariants={dueVariants}
+            userProgress={userProgress}
+            totalAttempts={totalAttempts}
+            totalSuccesses={totalSuccesses}
+            masteredOpenings={masteredOpenings}
+            viennaMastered={viennaMastered}
+            onStartVariant={startVariant}
+            onOpenViennaDirectory={() => setActiveView('vienna-directory')}
+            onStartSrsReview={startSrsReview}
+            onDeleteCustomRepertoire={handleDeleteCustomRepertoire}
+            onExportProgress={handleExportProgress}
+            onImportProgress={handleImportProgress}
+            onResetProgress={handleResetProgress}
+          />
+        ) : activeView === 'vienna-directory' ? (
+          <ViennaDirectory
+            popularChapters={popularViennaChapters}
+            unpopularChapters={unpopularViennaChapters}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            expandedChapters={expandedChapters}
+            toggleChapterExpand={toggleChapterExpand}
+            userProgress={userProgress}
+            showUnpopularChapters={showUnpopularChapters}
+            setShowUnpopularChapters={setShowUnpopularChapters}
+            onStartVariant={startVariant}
+            onStartRumbleChallenge={startRumbleChallenge}
+            onStartStudyMainLines={startStudyMainLines}
+            onBackToMenu={() => { setActiveView('menu'); setSearchQuery(''); }}
+            viennaStats={{
+              attempts: viennaAttempts,
+              successes: viennaSuccesses,
+              mastered: viennaMastered,
+              total: viennaVariants.length
+            }}
+          />
         ) : (
-          /* ================= 3. DEDICATED VIENNA DIRECTORY EXPLORER VIEW ================= */
-          <div className="space-y-6 animate-fadeIn">
-            {/* Navigation and Title */}
-            <div>
-              <button
-                onClick={() => { setActiveView('menu'); setSearchQuery(''); }}
-                className="flex items-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-brand-dark dark:hover:text-brand-secondary transition-colors cursor-pointer mb-3"
-              >
-                <ArrowLeft size={14} className="mr-1" />
-                Back to Main Menu
-              </button>
-              
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-6">
-                  <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight">Vienna Directory</h2>
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
-                      Explore, select, and practice all chapters and alternative subvariations parsed from your Lichess study.
-                    </p>
-                  </div>
-                  
-                  {/* Playlist Action Buttons */}
-                  <div className="flex gap-3 mt-2 md:mt-0 shrink-0">
-                    <button
-                      onClick={startRumbleChallenge}
-                      className="px-5 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs shadow transition-all active:scale-[0.98] cursor-pointer flex items-center gap-1.5 border border-brand-primary select-none font-bold"
-                      title="Train in a random survival checklist challenge"
-                    >
-                      <Zap size={14} className="fill-white animate-pulse" />
-                      Rumble Challenge
-                    </button>
-                    
-                    <button
-                      onClick={startStudyMainLines}
-                      className="px-5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-850 hover:border-brand-primary/45 dark:hover:border-brand-primary/30 transition-all font-bold text-xs shadow-sm active:scale-[0.98] cursor-pointer flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300 select-none font-bold"
-                      title="Study the critical Main Lines of all 11 popular chapters sequentially"
-                    >
-                      <BookOpen size={14} />
-                      Study Main Lines
-                    </button>
-                  </div>
-                </div>
-
-                {/* Vienna Specific Stats Banner */}
-                <div className="flex gap-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 rounded-lg text-xs font-medium shadow-sm">
-                  <div>
-                    <span className="text-neutral-450 font-semibold block">Vienna Attempts</span>
-                    <span className="text-sm font-black">{viennaAttempts}</span>
-                  </div>
-                  <div className="border-l border-neutral-200 dark:border-neutral-800 pl-4">
-                    <span className="text-neutral-450 font-semibold block">Vienna Successes</span>
-                    <span className="text-sm font-black">{viennaSuccesses}</span>
-                  </div>
-                  <div className="border-l border-neutral-200 dark:border-neutral-800 pl-4">
-                    <span className="text-brand-primary font-semibold block">Mastered Variations</span>
-                    <span className="text-sm font-black text-brand-primary">{viennaMastered} / {viennaVariants.length}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative max-w-md w-full">
-              <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search Vienna chapters..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-primary transition-all text-brand-dark dark:text-brand-secondary placeholder-neutral-400"
-              />
-            </div>
-
-            {/* Grid of Selectable Chapter Cards (Popular ones) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredPopularChapters.length > 0 ? (
-                filteredPopularChapters.map((chapter) => renderChapterCard(chapter))
-              ) : searchQuery && filteredUnpopularChapters.length === 0 ? (
-                <div className="col-span-full text-center py-16 text-neutral-400 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl animate-fadeIn">
-                  <Compass className="mx-auto text-neutral-350 mb-3 animate-pulse" size={36} />
-                  <p className="text-sm font-medium">No chapters found matching your search</p>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Unpopular Chapters Collapsible Section */}
-            {filteredUnpopularChapters.length > 0 && (
-              <div className="pt-8 border-t border-neutral-200 dark:border-neutral-800/80 mt-12 space-y-6">
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => setShowUnpopularChapters(!showUnpopularChapters)}
-                    className="px-6 py-2.5 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-850 hover:border-brand-primary/40 dark:hover:border-brand-primary/30 transition-all font-bold text-xs shadow-sm cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] text-neutral-500 dark:text-neutral-400"
-                  >
-                    <span>{showUnpopularChapters ? 'Hide not so popular variations' : 'Not so popular variations'}</span>
-                    <ChevronDown size={14} className={`transition-transform duration-200 ${showUnpopularChapters ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
-
-                {(showUnpopularChapters || searchQuery) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
-                    {filteredUnpopularChapters.map((chapter) => renderChapterCard(chapter))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <ChangelogView onBackToMenu={() => setActiveView('menu')} />
         )}
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-neutral-200 dark:border-neutral-800 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500 bg-white/30 dark:bg-neutral-900/30">
-        <p>ChessOp &copy; 2026 - Minimal Open Source Chess Opening Repetitor.</p>
-        <p className="mt-1 font-semibold text-neutral-500 dark:text-neutral-400">
-          Designed for 100% local storage and ultra-low resource consumption.
-        </p>
-      </footer>
+      <Footer />
 
-      {/* Floating Version & Changelog Widget */}
-      <div className="fixed bottom-4 right-4 z-50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 shadow-lg flex items-center gap-2 text-[10px] md:text-xs font-bold text-neutral-500 dark:text-neutral-400 select-none transition-all duration-300 hover:scale-105 hover:border-brand-primary/45">
-        <span className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          v1.0.1
-        </span>
-        <span className="text-neutral-300 dark:text-neutral-700">|</span>
-        <button
-          onClick={() => {
-            setCurrentVariant(null);
-            setIsCompleted(false);
-            setPlaylistMode('none');
-            setActiveView('changelog');
-          }}
-          className="text-brand-primary hover:text-brand-primary/80 transition-colors cursor-pointer font-extrabold underline decoration-brand-primary/30 underline-offset-2 font-black"
-        >
-          Changelog
-        </button>
-      </div>
+      {/* FLOATING VERSION WIDGET */}
+      <VersionWidget
+        version="v1.0.2"
+        onOpenChangelog={() => {
+          setCurrentVariant(null);
+          setIsCompleted(false);
+          setPlaylistMode('none');
+          setActiveView('changelog');
+        }}
+      />
+
+      {/* MODALS */}
+      <BoardThemeSelectorModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+        currentTheme={boardThemeId}
+        onSelectTheme={handleSelectBoardTheme}
+      />
+
+      <ImportPgnModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportCustomPgn}
+      />
+
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
     </div>
   );
 }
