@@ -5,10 +5,17 @@ export interface MoveNode {
   comment?: string; // Optional educational strategic comment
 }
 
+export type OpeningCategory =
+  | '1.e4 Open Games'
+  | '1.e4 Asymmetric Defenses'
+  | '1.d4 Systems & Classical'
+  | 'Gambits & Tactical Attacks';
+
 export interface OpeningVariant {
   id: string;
   name: string; // User-friendly name, e.g., "Najdorf Variation"
   openingName: string; // Main opening name, e.g., "Sicilian Defense"
+  category?: OpeningCategory;
   description: string; // Brief context or explanation
   side: 'white' | 'black'; // The side the user plays
   moves: MoveNode[]; // Ordered array of moves in this line

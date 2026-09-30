@@ -1029,7 +1029,7 @@ function App() {
       list.push({
         id: v.id,
         title: `${v.openingName}: ${v.name}`,
-        category: 'Default Repertoire',
+        category: v.category || '1.e4 Asymmetric Defenses',
         description: v.description,
         side: v.side,
         variants: [v]
@@ -1070,7 +1070,7 @@ function App() {
   }, [variants, viennaVariants]);
 
   const defaultChapters = useMemo(() => {
-    return chapters.filter(ch => ch.category === 'Default Repertoire');
+    return chapters.filter(ch => ch.category !== 'Vienna Repertoire');
   }, [chapters]);
 
   const popularViennaChapters = useMemo(() => {

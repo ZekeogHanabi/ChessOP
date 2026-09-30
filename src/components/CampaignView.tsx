@@ -64,6 +64,9 @@ export const CampaignView: React.FC<Props> = ({
   const getWorldIcon = (worldId: string) => {
     if (worldId.includes('vienna')) return <Castle size={18} />;
     if (worldId.includes('asymmetric')) return <Shield size={18} />;
+    if (worldId.includes('open')) return <Swords size={18} />;
+    if (worldId.includes('granite') || worldId.includes('d4')) return <Crown size={18} />;
+    if (worldId.includes('gambit')) return <Flame size={18} />;
     return <Swords size={18} />;
   };
 
