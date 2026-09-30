@@ -71,8 +71,19 @@ export interface PositionEvaluation {
   isMate?: boolean;
 }
 
-export type AppView = 'menu' | 'vienna-directory' | 'changelog' | 'analytics' | 'campaign';
+export type AppView = 'menu' | 'vienna-directory' | 'opening-directory' | 'changelog' | 'analytics' | 'campaign';
 export type PlaylistMode = 'none' | 'rumble' | 'study' | 'srs' | 'weakspots';
+
+export interface OpeningGroup {
+  id: string;
+  openingName: string;
+  category: OpeningCategory;
+  side: 'white' | 'black';
+  description: string;
+  variants: OpeningVariant[];
+  masteredCount: number;
+  totalVariants: number;
+}
 
 export interface CampaignLevel {
   id: string;
