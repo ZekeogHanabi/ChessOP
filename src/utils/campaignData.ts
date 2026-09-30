@@ -96,28 +96,60 @@ export const CAMPAIGN_WORLDS: CampaignWorld[] = [
       {
         id: 'asym-lvl-1',
         levelNumber: 1,
-        title: 'Sicilian Defense: Najdorf',
-        subtitle: 'Sharp Asymmetric Counterplay',
+        title: 'Najdorf Counter-Strike',
+        subtitle: 'Sicilian Defense: Najdorf',
         variantId: 'sicilian-najdorf',
         description: 'Fischer and Kasparov\'s ultimate weapon. Fight for the center asymmetrically with dynamic flank play.'
       },
       {
         id: 'asym-lvl-2',
         levelNumber: 2,
-        title: 'Caro-Kann Defense: Classical',
-        subtitle: 'Steel Pawn Structure (1.e4 c6)',
+        title: 'The Dragon\'s Breath',
+        subtitle: 'Sicilian Defense: Dragon',
+        variantId: 'sicilian-dragon',
+        description: 'Unleash the dark-squared bishop along the great diagonal and strike the enemy King in opposite-castling warfare.'
+      },
+      {
+        id: 'asym-lvl-3',
+        levelNumber: 3,
+        title: 'The Steel Fortress',
+        subtitle: 'Caro-Kann: Classical',
         variantId: 'caro-kann-classical',
-        description: 'Rock-solid structure neutralizing White\'s initiative and punishing overambitious attacks.'
+        description: 'Rock-solid structure neutralizing White\'s initiative and converting positional advantages into endgame triumph.'
+      },
+      {
+        id: 'asym-lvl-4',
+        levelNumber: 4,
+        title: 'Advance Infiltration',
+        subtitle: 'Caro-Kann: Advance',
+        variantId: 'caro-kann-advance',
+        description: 'Develop the light bishop actively outside the pawn chain and batter the d4 base with ...c5 and ...Qb6.'
+      },
+      {
+        id: 'asym-lvl-5',
+        levelNumber: 5,
+        title: 'The Winawer Bastion',
+        subtitle: 'French Defense: Winawer',
+        variantId: 'french-winawer',
+        description: 'Pin the white knight with 3...Bb4, inflict doubled pawns on the queenside, and launch a furious counterattack.'
+      },
+      {
+        id: 'asym-lvl-6',
+        levelNumber: 6,
+        title: 'Siege of the Center',
+        subtitle: 'French Defense: Advance',
+        variantId: 'french-advance',
+        description: 'Lay relentless siege to the d4 pawn pyramid with the combined firepower of ...c5, ...Nc6, and ...Qb6.'
       },
       {
         id: 'asym-lvl-boss',
-        levelNumber: 3,
-        title: 'World Boss: Sicilian Bastion',
-        subtitle: 'Najdorf Sparring vs AI Bot',
-        variantId: 'sicilian-najdorf',
+        levelNumber: 7,
+        title: 'World Boss: Dragon Bastion Duel',
+        subtitle: 'Tactical Sicilian Sparring vs AI Bot',
+        variantId: 'sicilian-dragon',
         isBoss: true,
         bossDifficulty: 'master',
-        description: 'Prove your strategic mastery by converting dynamic Sicilian advantages into victory against the AI.'
+        description: 'Convert dynamic Sicilian advantages into victory against the master AI in a tactical sparring clash.'
       }
     ]
   },
@@ -125,27 +157,171 @@ export const CAMPAIGN_WORLDS: CampaignWorld[] = [
     id: 'world-3-open-classics',
     worldNumber: 3,
     title: 'The Open Classics',
-    subtitle: 'The Grand Spanish School',
-    description: 'The positional bedrock of classical chess featuring 1.e4 e5 and the legendary Berlin Wall.',
+    subtitle: 'The Grand Spanish & Italian Academy',
+    description: 'The positional bedrock and romantic tactical roots of classical chess featuring 1.e4 e5.',
     theme: 'sapphire',
     levels: [
       {
         id: 'open-lvl-1',
         levelNumber: 1,
-        title: 'Ruy Lopez: Berlin Defense',
-        subtitle: 'The Berlin Wall (3...Nf6)',
+        title: 'The Berlin Wall',
+        subtitle: 'Ruy Lopez: Berlin Defense',
         variantId: 'ruy-lopez-berlin',
-        description: 'The impenetrable fortress used by Vladimir Kramnik to dethrone Garry Kasparov in the World Championship.'
+        description: 'The impenetrable fortress used by Vladimir Kramnik to neutralize Garry Kasparov in the World Championship.'
+      },
+      {
+        id: 'open-lvl-2',
+        levelNumber: 2,
+        title: 'The Spanish Masterpiece',
+        subtitle: 'Ruy Lopez: Morphy Main Line',
+        variantId: 'ruy-lopez-morphy',
+        description: 'The crowning glory of classical chess: master the knight maneuver d2-f1-g3 and build the mighty Spanish center.'
+      },
+      {
+        id: 'open-lvl-3',
+        levelNumber: 3,
+        title: 'The Quiet Harmony',
+        subtitle: 'Italian Game: Giuoco Piano',
+        variantId: 'italian-giuoco-piano',
+        description: 'Harmonious piece coordination targeting f7, supported by the patient c3 and d3 central foundation.'
+      },
+      {
+        id: 'open-lvl-4',
+        levelNumber: 4,
+        title: 'Romantic Fireworks',
+        subtitle: 'Italian Game: Evans Gambit',
+        variantId: 'italian-evans-gambit',
+        description: 'Sacrifice the b-pawn for rapid tempo, build a colossal pawn center, and blast open lines against the uncastled King.'
+      },
+      {
+        id: 'open-lvl-5',
+        levelNumber: 5,
+        title: 'Sacrificial Carnage',
+        subtitle: 'Two Knights: Fried Liver Attack',
+        variantId: 'italian-fried-liver',
+        description: 'Execute the audacious 6.Nxf7! knight sacrifice, dragging the enemy king into the center of the board.'
+      },
+      {
+        id: 'open-lvl-6',
+        levelNumber: 6,
+        title: 'Dynamic Strike',
+        subtitle: 'Scotch Game: Mieses Variation',
+        variantId: 'scotch-mieses',
+        description: 'Blow open the center on move 3 and establish relentless pressure with 6.e5! and 7.Qe2.'
       },
       {
         id: 'open-lvl-boss',
-        levelNumber: 2,
-        title: 'World Boss: Berlin Fortress Duel',
-        subtitle: 'Positional Endgame Sparring vs Bot',
-        variantId: 'ruy-lopez-berlin',
+        levelNumber: 7,
+        title: 'World Boss: Italian Colosseum Duel',
+        subtitle: 'Open Game Sparring vs AI Bot',
+        variantId: 'italian-evans-gambit',
         isBoss: true,
         bossDifficulty: 'master',
-        description: 'Withstand the pressure, mobilize the bishop pair, and neutralize White\'s activity in a masterclass endgame.'
+        description: 'Demonstrate tactical precision and conversion technique against the master AI in an open sparring duel.'
+      }
+    ]
+  },
+  {
+    id: 'world-4-granite-empires',
+    worldNumber: 4,
+    title: 'The Granite Empires',
+    subtitle: '1.d4 Classical & Hypermodern Clashes',
+    description: 'Command the royal d4 systems: from the impregnable London pyramid and Carlsbad structures to the hypermodern Mar del Plata avalanche.',
+    theme: 'gold',
+    levels: [
+      {
+        id: 'd4-lvl-1',
+        levelNumber: 1,
+        title: 'The Carlsbad Minority',
+        subtitle: 'QGD: Exchange Variation',
+        variantId: 'qgd-exchange',
+        description: 'Master the celebrated pawn exchange and launch the queenside minority attack with b4-b5.'
+      },
+      {
+        id: 'd4-lvl-2',
+        levelNumber: 2,
+        title: 'Tartakower\'s Bastion',
+        subtitle: 'QGD: Tartakower Defense',
+        variantId: 'qgd-tartakower',
+        description: 'Solve the light-squared bishop challenge with ...h6 and ...b6 for an unbreakable pawn structure.'
+      },
+      {
+        id: 'd4-lvl-3',
+        levelNumber: 3,
+        title: 'The London Citadel',
+        subtitle: 'London System: Classical',
+        variantId: 'london-system',
+        description: 'Erect the granite pawn pyramid with 2.Bf4 and establish an immovable knight outpost on e5.'
+      },
+      {
+        id: 'd4-lvl-4',
+        levelNumber: 4,
+        title: 'Mar del Plata Storm',
+        subtitle: 'King\'s Indian Defense',
+        variantId: 'kings-indian',
+        description: 'Lock the center and charge forward on the kingside with the ferocious ...f5 pawn avalanche.'
+      },
+      {
+        id: 'd4-lvl-5',
+        levelNumber: 5,
+        title: 'The Granite Wall',
+        subtitle: 'Slav Defense: Classical',
+        variantId: 'slav-defense',
+        description: 'Defend d5 with 2...c6, liberate the bishop to f5, and strike back against White\'s center.'
+      },
+      {
+        id: 'd4-lvl-boss',
+        levelNumber: 6,
+        title: 'World Boss: King\'s Indian Mating Duel',
+        subtitle: 'Hypermodern Sparring vs Master AI',
+        variantId: 'kings-indian',
+        isBoss: true,
+        bossDifficulty: 'master',
+        description: 'Weather the queenside storm and deliver checkmate against the Master AI in a high-stakes sparring duel.'
+      }
+    ]
+  },
+  {
+    id: 'world-5-romantic-gambits',
+    worldNumber: 5,
+    title: 'The Romantic Gambits',
+    subtitle: 'Sacrificial Fire & King Hunts',
+    description: 'Relive the golden age of chess: sacrifice material for blistering tempi, raking diagonals, and devastating king attacks.',
+    theme: 'emerald',
+    levels: [
+      {
+        id: 'gambit-lvl-1',
+        levelNumber: 1,
+        title: 'The King\'s Blade',
+        subtitle: 'King\'s Gambit: Knight Variation',
+        variantId: 'kings-gambit',
+        description: 'Sacrifice the f-pawn on move 2 to blast open the f-file and rule the center in the immortal Romantic style.'
+      },
+      {
+        id: 'gambit-lvl-2',
+        levelNumber: 2,
+        title: 'Dual Bishop Crossfire',
+        subtitle: 'Danish Gambit: Accepted',
+        variantId: 'danish-gambit',
+        description: 'Sacrifice two full pawns to set up a terrifying pair of bishops raking the undefended black kingside.'
+      },
+      {
+        id: 'gambit-lvl-3',
+        levelNumber: 3,
+        title: 'The Sicilian Sacrifice',
+        subtitle: 'Smith-Morra Gambit',
+        variantId: 'smith-morra-gambit',
+        description: 'Tear open the c- and d-files against the Sicilian Defense with the energetic 2.d4 and 3.c3 pawn offer.'
+      },
+      {
+        id: 'gambit-lvl-boss',
+        levelNumber: 4,
+        title: 'World Boss: Romantic King Hunt',
+        subtitle: 'Sacrificial Gambit Sparring vs Bot',
+        variantId: 'kings-gambit',
+        isBoss: true,
+        bossDifficulty: 'master',
+        description: 'Convert overwhelming sacrificial initiative into a king hunt victory against the master AI.'
       }
     ]
   }

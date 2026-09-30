@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import {
   Compass,
   CheckCircle2,
@@ -13,9 +13,18 @@ import {
   BarChart3,
   Star,
   Map,
-  Smartphone
+  Smartphone,
+  Layers
 } from 'lucide-react';
 import { OpeningVariant, UserProgress, GamificationProfile } from '../types';
+
+export const OPENING_CATEGORIES = [
+  { id: 'all', label: 'All Openings' },
+  { id: '1.e4 Open Games', label: '1.e4 Open Games' },
+  { id: '1.e4 Asymmetric Defenses', label: '1.e4 Asymmetric Defenses' },
+  { id: '1.d4 Systems & Classical', label: '1.d4 Systems & Classical' },
+  { id: 'Gambits & Tactical Attacks', label: 'Gambits & Tactical Attacks' },
+] as const;
 
 interface Chapter {
   id: string;
@@ -98,6 +107,25 @@ export const MainMenuView: React.FC<Props> = ({
       fileInputRef.current.value = '';
     }
   };
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  const categoryCounts = useMemo(() => {
+    return {
+      all: defaultChapters.length + (viennaVariants.length > 0 ? 1 : 0),
+      '1.e4 Open Games': defaultChapters.filter(c => c.category === '1.e4 Open Games').length + (viennaVariants.length > 0 ? 1 : 0),
+      '1.e4 Asymmetric Defenses': defaultChapters.filter(c => c.category === '1.e4 Asymmetric Defenses').length,
+      '1.d4 Systems & Classical': defaultChapters.filter(c => c.category === '1.d4 Systems & Classical').length,
+      'Gambits & Tactical Attacks': defaultChapters.filter(c => c.category === 'Gambits & Tactical Attacks').length,
+    };
+  }, [defaultChapters, viennaVariants.length]);
+
+  const filteredChapters = useMemo(() => {
+    if (selectedCategory === 'all') return defaultChapters;
+    return defaultChapters.filter(ch => ch.category === selectedCategory);
+  }, [defaultChapters, selectedCategory]);
+
+  const showViennaCard = (selectedCategory === 'all' || selectedCategory === '1.e4 Open Games') && viennaVariants.length > 0;
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
@@ -244,127 +272,165 @@ export const MainMenuView: React.FC<Props> = ({
 
       {/* Repertoire Categories & Clean Grid */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-          <Compass size={18} className="text-brand-primary" />
-          Select an Opening Repertoire
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* A. Default Repertoires */}
-          {defaultChapters.map((chapter) => {
-            const variant = chapter.variants[0];
-            const progress = userProgress[variant.id];
-            const hasCompletedDemo = progress?.demoCompleted ?? false;
-            const practiceCount = progress?.successes ?? 0;
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <Compass size={18} className="text-brand-primary" />
+            Select an Opening Repertoire
+          </h3>
 
-            return (
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {OPENING_CATEGORIES.map(cat => {
+              const count = categoryCounts[cat.id] ?? 0;
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 border-neutral-900 dark:border-white shadow-xs'
+                      : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700'
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    isSelected
+                      ? 'bg-white/20 text-white dark:bg-black/15 dark:text-neutral-950'
+                      : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {filteredChapters.length === 0 && !showViennaCard ? (
+          <div className="text-center py-12 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-8">
+            <Layers className="w-10 h-10 mx-auto text-neutral-400 mb-3" />
+            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No openings found in this category yet</p>
+            <p className="text-xs text-neutral-400 mt-1">Select another category or "All Openings" to browse available repertoires.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* A. Filtered Repertoires */}
+            {filteredChapters.map((chapter) => {
+              const variant = chapter.variants[0];
+              const progress = userProgress[variant.id];
+              const hasCompletedDemo = progress?.demoCompleted ?? false;
+              const practiceCount = progress?.successes ?? 0;
+
+              return (
+                <div
+                  key={chapter.id}
+                  className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md"
+                >
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
+                          {variant.openingName}
+                        </span>
+                        <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${
+                        variant.side === 'white'
+                          ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
+                          : 'bg-brand-dark text-white border border-brand-dark'
+                      }`}>
+                        {variant.side === 'white' ? 'White' : 'Black'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
+                      {variant.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
+                    <div className="flex items-center space-x-3 text-xs">
+                      {hasCompletedDemo ? (
+                        <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
+                          <CheckCircle2 size={14} className="mr-1" /> Demo OK
+                        </span>
+                      ) : (
+                        <span className="text-neutral-400 font-medium flex items-center">
+                          <Info size={14} className="mr-1" /> Demo Pending
+                        </span>
+                      )}
+
+                      {gamificationProfile?.stars[variant.id] && (
+                        <div className="flex items-center gap-0.5" title={`${gamificationProfile.stars[variant.id]} Stars`}>
+                          {[1, 2, 3].map(s => (
+                            <Star
+                              key={s}
+                              size={12}
+                              className={s <= gamificationProfile.stars[variant.id] ? 'fill-amber-400 text-amber-400' : 'text-neutral-300 dark:text-neutral-700'}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {practiceCount > 0 && !gamificationProfile?.stars[variant.id] && (
+                        <span className="text-brand-primary font-semibold">
+                          {practiceCount}x Completed
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => onStartVariant(variant)}
+                      className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-xs flex items-center cursor-pointer font-bold"
+                    >
+                      <Play size={12} className="mr-1 fill-white" /> Train
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* B. Vienna Repertoire Card */}
+            {showViennaCard && (
               <div
-                key={chapter.id}
-                className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md"
+                className="bg-white dark:bg-neutral-900 border-2 border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/50 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md relative overflow-hidden"
               >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
-                        {variant.openingName}
+                      <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
+                        Vienna Game
                       </span>
-                      <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
+                      <h4 className="text-lg font-black tracking-tight mt-0.5">Vienna Opening Repertoire</h4>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${
-                      variant.side === 'white'
-                        ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
-                        : 'bg-brand-dark text-white border border-brand-dark'
-                    }`}>
-                      {variant.side === 'white' ? 'White' : 'Black'}
+                    <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                      White
                     </span>
                   </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                    {variant.description}
+                    A practical, active-recall repertoire for the Vienna Game (1.e4 e5 2.Nc3). Master the signature Vienna Gambit and major variations using dynamic chapter training.
                   </p>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
                   <div className="flex items-center space-x-3 text-xs">
-                    {hasCompletedDemo ? (
-                      <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                        <CheckCircle2 size={14} className="mr-1" /> Demo OK
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 font-medium flex items-center">
-                        <Info size={14} className="mr-1" /> Demo Pending
-                      </span>
-                    )}
-
-                    {gamificationProfile?.stars[variant.id] && (
-                      <div className="flex items-center gap-0.5" title={`${gamificationProfile.stars[variant.id]} estrellas`}>
-                        {[1, 2, 3].map(s => (
-                          <Star
-                            key={s}
-                            size={12}
-                            className={s <= gamificationProfile.stars[variant.id] ? 'fill-amber-400 text-amber-400' : 'text-neutral-300 dark:text-neutral-700'}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    {practiceCount > 0 && !gamificationProfile?.stars[variant.id] && (
-                      <span className="text-brand-primary font-semibold">
-                        {practiceCount}x Completed
-                      </span>
-                    )}
+                    <span className="text-neutral-400 font-medium">
+                      {viennaMastered} / {viennaVariants.length} Mastered
+                    </span>
                   </div>
 
                   <button
-                    onClick={() => onStartVariant(variant)}
+                    onClick={onOpenViennaDirectory}
                     className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-xs flex items-center cursor-pointer font-bold"
                   >
-                    <Play size={12} className="mr-1 fill-white" /> Train
+                    <Compass size={12} className="mr-1" /> Choose Chapters
                   </button>
                 </div>
               </div>
-            );
-          })}
-
-          {/* B. Vienna Repertoire Card */}
-          {viennaVariants.length > 0 && (
-            <div
-              className="bg-white dark:bg-neutral-900 border-2 border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/50 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
-                      Vienna Game
-                    </span>
-                    <h4 className="text-lg font-black tracking-tight mt-0.5">Vienna Opening Repertoire</h4>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                    White
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                  A practical, active-recall repertoire for the Vienna Game (1.e4 e5 2.Nc3). Master the signature Vienna Gambit and major variations using dynamic chapter training.
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
-                <div className="flex items-center space-x-3 text-xs">
-                  <span className="text-neutral-400 font-medium">
-                    {viennaMastered} / {viennaVariants.length} Mastered
-                  </span>
-                </div>
-
-                <button
-                  onClick={onOpenViennaDirectory}
-                  className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-xs flex items-center cursor-pointer font-bold"
-                >
-                  <Compass size={12} className="mr-1" /> Choose Chapters
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* C. Custom User Repertoires (if any imported) */}
