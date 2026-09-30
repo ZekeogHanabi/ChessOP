@@ -2,7 +2,6 @@ import React, { useRef, useState, useMemo } from 'react';
 import {
   Compass,
   CheckCircle2,
-  Info,
   Play,
   RotateCcw,
   Download,
@@ -13,9 +12,12 @@ import {
   BarChart3,
   Star,
   Map,
-  Layers
+  Layers,
+  Folder,
+  FolderOpen
 } from 'lucide-react';
-import { OpeningVariant, UserProgress, GamificationProfile } from '../types';
+import { OpeningVariant, UserProgress, GamificationProfile, OpeningGroup } from '../types';
+import { getOpeningMetadata } from '../data/openings/metadata';
 
 export const OPENING_CATEGORIES = [
   { id: 'all', label: 'All Openings' },
@@ -36,6 +38,7 @@ interface Chapter {
 
 interface Props {
   defaultChapters: Chapter[];
+  defaultVariants?: OpeningVariant[];
   viennaVariants: OpeningVariant[];
   customVariants: OpeningVariant[];
   dueVariants: OpeningVariant[];
@@ -47,6 +50,7 @@ interface Props {
   gamificationProfile?: GamificationProfile;
   onStartVariant: (variant: OpeningVariant) => void;
   onOpenViennaDirectory: () => void;
+  onOpenOpeningDirectory: (openingName: string) => void;
   onStartSrsReview: () => void;
   onOpenAnalytics: () => void;
   onOpenCampaign?: () => void;
@@ -58,6 +62,7 @@ interface Props {
 
 export const MainMenuView: React.FC<Props> = ({
   defaultChapters,
+  defaultVariants,
   viennaVariants,
   customVariants,
   dueVariants,
@@ -69,6 +74,7 @@ export const MainMenuView: React.FC<Props> = ({
   gamificationProfile,
   onStartVariant,
   onOpenViennaDirectory,
+  onOpenOpeningDirectory,
   onStartSrsReview,
   onOpenAnalytics,
   onOpenCampaign,
@@ -103,24 +109,80 @@ export const MainMenuView: React.FC<Props> = ({
     }
   };
 
+  // Group standard variants by openingName into Repertoire Folders
+  const openingGroups = useMemo(() => {
+    const rawVariants = defaultVariants && defaultVariants.length > 0
+      ? defaultVariants
+      : defaultChapters.flatMap(c => c.variants);
+
+    const map: Record<string, OpeningVariant[]> = {};
+    rawVariants.forEach(v => {
+      const key = v.openingName;
+      if (!map[key]) map[key] = [];
+      map[key].push(v);
+    });
+
+    const groups: (OpeningGroup & { totalStars: number })[] = Object.entries(map).map(([name, vars]) => {
+      const meta = getOpeningMetadata(name, vars[0]);
+      const masteredCount = vars.filter(v => (userProgress[v.id]?.successes || 0) > 0).length;
+      let totalStars = 0;
+      vars.forEach(v => {
+        totalStars += gamificationProfile?.stars[v.id] || 0;
+      });
+
+      return {
+        id: vars[0].id.split('-')[0] || name.toLowerCase().replace(/\s+/g, '-'),
+        openingName: name,
+        category: meta.category,
+        side: meta.side,
+        description: meta.description,
+        variants: vars,
+        masteredCount,
+        totalVariants: vars.length,
+        totalStars
+      };
+    });
+
+    // Also include Vienna Game as a standard Repertoire Folder!
+    if (viennaVariants.length > 0) {
+      const viennaMeta = getOpeningMetadata('Vienna Game', viennaVariants[0]);
+      let viennaStars = 0;
+      viennaVariants.forEach(v => {
+        viennaStars += gamificationProfile?.stars[v.id] || 0;
+      });
+
+      groups.push({
+        id: 'vienna-game',
+        openingName: 'Vienna Game',
+        category: '1.e4 Open Games',
+        side: 'white',
+        description: viennaMeta.description,
+        variants: viennaVariants,
+        masteredCount: viennaMastered,
+        totalVariants: viennaVariants.length,
+        totalStars: viennaStars
+      });
+    }
+
+    return groups;
+  }, [defaultVariants, defaultChapters, viennaVariants, viennaMastered, userProgress, gamificationProfile]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const categoryCounts = useMemo(() => {
     return {
-      all: defaultChapters.length + (viennaVariants.length > 0 ? 1 : 0),
-      '1.e4 Open Games': defaultChapters.filter(c => c.category === '1.e4 Open Games').length + (viennaVariants.length > 0 ? 1 : 0),
-      '1.e4 Asymmetric Defenses': defaultChapters.filter(c => c.category === '1.e4 Asymmetric Defenses').length,
-      '1.d4 Systems & Classical': defaultChapters.filter(c => c.category === '1.d4 Systems & Classical').length,
-      'Gambits & Tactical Attacks': defaultChapters.filter(c => c.category === 'Gambits & Tactical Attacks').length,
+      all: openingGroups.length,
+      '1.e4 Open Games': openingGroups.filter(g => g.category === '1.e4 Open Games').length,
+      '1.e4 Asymmetric Defenses': openingGroups.filter(g => g.category === '1.e4 Asymmetric Defenses').length,
+      '1.d4 Systems & Classical': openingGroups.filter(g => g.category === '1.d4 Systems & Classical').length,
+      'Gambits & Tactical Attacks': openingGroups.filter(g => g.category === 'Gambits & Tactical Attacks').length,
     };
-  }, [defaultChapters, viennaVariants.length]);
+  }, [openingGroups]);
 
-  const filteredChapters = useMemo(() => {
-    if (selectedCategory === 'all') return defaultChapters;
-    return defaultChapters.filter(ch => ch.category === selectedCategory);
-  }, [defaultChapters, selectedCategory]);
-
-  const showViennaCard = (selectedCategory === 'all' || selectedCategory === '1.e4 Open Games') && viennaVariants.length > 0;
+  const filteredOpeningGroups = useMemo(() => {
+    if (selectedCategory === 'all') return openingGroups;
+    return openingGroups.filter(g => g.category === selectedCategory);
+  }, [openingGroups, selectedCategory]);
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
@@ -302,7 +364,7 @@ export const MainMenuView: React.FC<Props> = ({
           </div>
         </div>
 
-        {filteredChapters.length === 0 && !showViennaCard ? (
+        {filteredOpeningGroups.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-8">
             <Layers className="w-10 h-10 mx-auto text-neutral-400 mb-3" />
             <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No openings found in this category yet</p>
@@ -310,120 +372,103 @@ export const MainMenuView: React.FC<Props> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* A. Filtered Repertoires */}
-            {filteredChapters.map((chapter) => {
-              const variant = chapter.variants[0];
-              const progress = userProgress[variant.id];
-              const hasCompletedDemo = progress?.demoCompleted ?? false;
-              const practiceCount = progress?.successes ?? 0;
+            {filteredOpeningGroups.map((group) => {
+              const isVienna = group.openingName === 'Vienna Game' || group.openingName === 'Vienna Repertoire';
+              const isAllMastered = group.masteredCount === group.totalVariants && group.totalVariants > 0;
 
               return (
                 <div
-                  key={chapter.id}
-                  className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-350 dark:hover:border-neutral-700 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md"
+                  key={group.id}
+                  className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-brand-primary/40 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md relative overflow-hidden group"
                 >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none group-hover:scale-110 transition-transform" />
+
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start gap-2">
                       <div>
-                        <span className="text-xs font-semibold text-neutral-400 tracking-wider uppercase">
-                          {variant.openingName}
-                        </span>
-                        <h4 className="text-lg font-bold tracking-tight mt-0.5">{variant.name}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <Folder size={12} className="text-brand-primary" />
+                          <span className="text-[10px] font-black text-brand-primary tracking-wider uppercase">
+                            {group.category}
+                          </span>
+                        </div>
+                        <h4 className="text-lg font-black tracking-tight mt-1 text-neutral-900 dark:text-neutral-100">
+                          {group.openingName}
+                        </h4>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${
-                        variant.side === 'white'
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                        group.side === 'white'
                           ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700'
                           : 'bg-brand-dark text-white border border-brand-dark'
                       }`}>
-                        {variant.side === 'white' ? 'White' : 'Black'}
+                        {group.side === 'white' ? 'White' : 'Black'}
                       </span>
                     </div>
+
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                      {variant.description}
+                      {group.description}
                     </p>
+
+                    {/* Preview of Lines */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      {isVienna ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                          8 Core Chapters (Main Line, Accepted, Declined, Hybrid...)
+                        </span>
+                      ) : (
+                        <>
+                          {group.variants.slice(0, 3).map(v => (
+                            <span
+                              key={v.id}
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
+                            >
+                              {v.name}
+                            </span>
+                          ))}
+                          {group.variants.length > 3 && (
+                            <span className="text-[10px] font-bold text-neutral-400">
+                              +{group.variants.length - 3} more
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
                     <div className="flex items-center space-x-3 text-xs">
-                      {hasCompletedDemo ? (
-                        <span className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                          <CheckCircle2 size={14} className="mr-1" /> Demo OK
-                        </span>
-                      ) : (
-                        <span className="text-neutral-400 font-medium flex items-center">
-                          <Info size={14} className="mr-1" /> Demo Pending
-                        </span>
-                      )}
+                      <span className={`font-semibold text-xs flex items-center gap-1 ${
+                        isAllMastered ? 'text-green-600 dark:text-green-400' : 'text-neutral-500 dark:text-neutral-400'
+                      }`}>
+                        {isAllMastered && <CheckCircle2 size={13} />}
+                        {group.masteredCount} / {group.totalVariants} Mastered
+                      </span>
 
-                      {gamificationProfile?.stars[variant.id] && (
-                        <div className="flex items-center gap-0.5" title={`${gamificationProfile.stars[variant.id]} Stars`}>
-                          {[1, 2, 3].map(s => (
-                            <Star
-                              key={s}
-                              size={12}
-                              className={s <= gamificationProfile.stars[variant.id] ? 'fill-amber-400 text-amber-400' : 'text-neutral-300 dark:text-neutral-700'}
-                            />
-                          ))}
+                      {group.totalStars > 0 && (
+                        <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
+                          <Star size={12} className="fill-amber-400 text-amber-400" />
+                          <span>{group.totalStars}</span>
                         </div>
-                      )}
-
-                      {practiceCount > 0 && !gamificationProfile?.stars[variant.id] && (
-                        <span className="text-brand-primary font-semibold">
-                          {practiceCount}x Completed
-                        </span>
                       )}
                     </div>
 
                     <button
-                      onClick={() => onStartVariant(variant)}
-                      className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-xs flex items-center cursor-pointer font-bold"
+                      onClick={() => {
+                        if (isVienna) {
+                          onOpenViennaDirectory();
+                        } else {
+                          onOpenOpeningDirectory(group.openingName);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-bold text-xs tracking-wide transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Play size={12} className="mr-1 fill-white" /> Train
+                      <FolderOpen size={13} />
+                      <span>{isVienna ? 'Choose Chapters' : 'Explore Variations'}</span>
                     </button>
                   </div>
                 </div>
               );
             })}
-
-            {/* B. Vienna Repertoire Card */}
-            {showViennaCard && (
-              <div
-                className="bg-white dark:bg-neutral-900 border-2 border-brand-primary/20 dark:border-brand-primary/10 hover:border-brand-primary/50 dark:hover:border-brand-primary/40 rounded-xl p-6 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-xs font-semibold text-brand-primary tracking-wider uppercase">
-                        Vienna Game
-                      </span>
-                      <h4 className="text-lg font-black tracking-tight mt-0.5">Vienna Opening Repertoire</h4>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
-                      White
-                    </span>
-                  </div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed min-h-[36px]">
-                    A practical, active-recall repertoire for the Vienna Game (1.e4 e5 2.Nc3). Master the signature Vienna Gambit and major variations using dynamic chapter training.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center gap-4">
-                  <div className="flex items-center space-x-3 text-xs">
-                    <span className="text-neutral-400 font-medium">
-                      {viennaMastered} / {viennaVariants.length} Mastered
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={onOpenViennaDirectory}
-                    className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 active:scale-95 text-white font-medium text-xs tracking-wide transition-all shadow-xs flex items-center cursor-pointer font-bold"
-                  >
-                    <Compass size={12} className="mr-1" /> Choose Chapters
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -469,12 +514,29 @@ export const MainMenuView: React.FC<Props> = ({
                     <span className="text-xs text-neutral-400">
                       Side: <strong className="capitalize">{vars[0]?.side || 'white'}</strong>
                     </span>
-                    <button
-                      onClick={() => onStartVariant(vars[0])}
-                      className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <Play size={12} className="fill-white" /> Train Line 1
-                    </button>
+                    {vars.length > 1 ? (
+                      <button
+                        onClick={() => onOpenOpeningDirectory(repName)}
+                        className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <FolderOpen size={12} /> Explore ({vars.length})
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => onOpenOpeningDirectory(repName)}
+                          className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => onStartVariant(vars[0])}
+                          className="px-4 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <Play size={12} className="fill-white" /> Train
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

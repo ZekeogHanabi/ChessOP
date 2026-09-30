@@ -41,6 +41,7 @@ import { Footer } from './components/Footer';
 import { VersionWidget } from './components/VersionWidget';
 import { MainMenuView } from './components/MainMenuView';
 import { ViennaDirectory } from './components/ViennaDirectory';
+import { OpeningDirectoryView } from './components/OpeningDirectoryView';
 import { TrainingView } from './components/TrainingView';
 import { ChangelogView } from './components/ChangelogView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -64,6 +65,7 @@ function App() {
 
   // --- Navigation & View State ---
   const [activeView, setActiveView] = useState<AppView>('menu');
+  const [selectedOpeningName, setSelectedOpeningName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
 
@@ -899,6 +901,7 @@ function App() {
     setOptionSquares({});
     setMaxReachedIndex(0);
     setStreak(0);
+    setSelectedOpeningName(null);
     setActiveView('menu');
   }, []);
 
@@ -906,6 +909,7 @@ function App() {
     setCurrentVariant(null);
     setIsCompleted(false);
     setPlaylistMode('none');
+    setSelectedOpeningName(null);
     setActiveView('campaign');
   }, []);
 
@@ -1072,6 +1076,15 @@ function App() {
   const defaultChapters = useMemo(() => {
     return chapters.filter(ch => ch.category !== 'Vienna Repertoire');
   }, [chapters]);
+
+  const defaultVariants = useMemo(() => {
+    return variants.filter(v => v.openingName !== 'Vienna Repertoire' && v.openingName !== 'Vienna Game' && !v.isCustom);
+  }, [variants]);
+
+  const selectedOpeningVariants = useMemo(() => {
+    if (!selectedOpeningName) return [];
+    return [...variants, ...customVariants].filter(v => v.openingName === selectedOpeningName);
+  }, [variants, customVariants, selectedOpeningName]);
 
   const popularViennaChapters = useMemo(() => {
     const VIENNA_UTILITY_ORDER = [
@@ -1450,6 +1463,7 @@ function App() {
         ) : activeView === 'menu' ? (
           <MainMenuView
             defaultChapters={defaultChapters}
+            defaultVariants={defaultVariants}
             viennaVariants={viennaVariants}
             customVariants={customVariants}
             dueVariants={dueVariants}
@@ -1461,6 +1475,10 @@ function App() {
             gamificationProfile={gamificationProfile}
             onStartVariant={startVariant}
             onOpenViennaDirectory={() => setActiveView('vienna-directory')}
+            onOpenOpeningDirectory={(openingName) => {
+              setSelectedOpeningName(openingName);
+              setActiveView('opening-directory');
+            }}
             onStartSrsReview={startSrsReview}
             onOpenAnalytics={() => setActiveView('analytics')}
             onOpenCampaign={openCampaign}
@@ -1468,6 +1486,18 @@ function App() {
             onExportProgress={handleExportProgress}
             onImportProgress={handleImportProgress}
             onResetProgress={handleResetProgress}
+          />
+        ) : activeView === 'opening-directory' && selectedOpeningName ? (
+          <OpeningDirectoryView
+            openingName={selectedOpeningName}
+            variants={selectedOpeningVariants}
+            userProgress={userProgress}
+            gamificationProfile={gamificationProfile}
+            onStartVariant={(variant, demo) => startVariant(variant, demo)}
+            onBackToMenu={() => {
+              setActiveView('menu');
+              setSelectedOpeningName(null);
+            }}
           />
         ) : activeView === 'vienna-directory' ? (
           <ViennaDirectory

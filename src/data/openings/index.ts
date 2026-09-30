@@ -8,6 +8,7 @@ export * from './e4_asymmetric';
 export * from './e4_open';
 export * from './d4_systems';
 export * from './gambits';
+export * from './metadata';
 
 export const OPENING_VARIANTS: OpeningVariant[] = [
   ...E4_ASYMMETRIC_OPENINGS,
